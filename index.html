@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kiosk Journey Prototype – Prohibited → Restricted → Cover Limits</title>
+
+  <!-- Google Material Symbols -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg:#f4f6fb;
+      --surface:#ffffff;
+      --panel:#eef2fb;
+      --text:#1e2230;
+      --muted:#5b6478;
+      --accent:#5b4c8a;
+      --accent2:#7a68b6;
+      --border:#d7ddea;
+      --danger:#c62828;
+      --warn:#b15c00;
+      --ok:#2e7d32;
+      --shadow: 0 8px 18px rgba(19,33,68,.10);
+      --radius: 14px;
+      --tile-h: 86px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+    .app{max-width:1100px;margin:0 auto;padding:22px;}
+    .chrome{
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:18px;
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .topbar{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:14px 16px;border-bottom:1px solid var(--border);background:#fff;
+    }
+    .left,.right{display:flex;gap:10px;align-items:center;}
+    .btn{
+      border:1px solid var(--border);
+      background:#fff;color:var(--text);
+      padding:10px 12px;border-radius:12px;
+      cursor:pointer;font-weight:700;
+      display:inline-flex;align-items:center;gap:8px;user-select:none;
+    }
+    .btn:active{transform:translateY(1px)}
+    .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+    .btn.ghost{background:transparent;border-color:transparent;color:var(--accent);}
+    .btn.danger{background:#fff;border-color:#f0b8b8;color:var(--danger);}
+    .btn.warn{background:#fff;border-color:#ffd6a5;color:var(--warn);}
+    .material-symbols-outlined{
+      font-variation-settings:"FILL" 0,"wght" 600,"GRAD" 0,"opsz" 24;
+      font-size:20px;line-height:1;
+    }
+    .content{
+      padding:20px;
+      background:linear-gradient(#ffffff,#f6f7fd);
+      min-height:640px;
+    }
+    h1{margin:4px 0 4px;font-size:34px;letter-spacing:.2px;color:#2a2550;}
+    .subtitle{color:var(--muted);margin:0 0 16px;font-size:16px;}
+    .stepHeader{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px;}
+    .pill{
+      display:inline-flex;gap:8px;align-items:center;
+      padding:8px 12px;border-radius:999px;border:1px solid var(--border);
+      background:var(--panel);color:#2b2a44;font-weight:800;font-size:13px;
+    }
+    .gridWrap{
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:18px;
+      padding:14px;
+    }
+    .grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;}
+    .tile{
+      height:var(--tile-h);
+      border:1px solid var(--border);
+      background:#fff;border-radius:14px;
+      display:flex;align-items:center;gap:12px;
+      padding:10px 12px;cursor:pointer;
+      box-shadow:0 2px 0 rgba(0,0,0,.02);
+      text-align:left;
+    }
+    .tile:hover{border-color:#c8cfe2}
+    .tile .icon{
+      width:44px;height:44px;border-radius:12px;
+      display:flex;align-items:center;justify-content:center;
+      background:#f1effa;color:var(--accent);flex:0 0 auto;
+    }
+    .tile .label{font-weight:900;font-size:14px;line-height:1.15;}
+    .tile .hint{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.1;}
+    .tile.selected{border-color:var(--accent2);box-shadow:0 0 0 3px rgba(122,104,182,.18);}
+    .details{
+      margin-top:14px;border:1px solid var(--border);
+      background:#fff;border-radius:16px;padding:14px;display:none;
+    }
+    .details.show{display:block;}
+    .detailsTop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}
+    .detailsTitle{display:flex;gap:10px;align-items:center;font-weight:900;color:#2a2550;}
+    .detailsTitle .icon{
+      width:36px;height:36px;border-radius:12px;background:#f1effa;
+      display:flex;align-items:center;justify-content:center;color:var(--accent);
+    }
+    .detailsText{margin-top:10px;color:#293047;line-height:1.35;}
+    .banner{
+      margin-top:10px;padding:10px 12px;border-radius:12px;
+      font-weight:800;display:none;
+    }
+    .banner.show{display:block;}
+    .banner.danger{border:1px solid #f0b8b8;background:#fff6f6;color:#8b1f1f;}
+    .banner.warn{border:1px solid #ffd6a5;background:#fff8ee;color:#7a3f00;}
+    .banner.ok{border:1px solid #c7e7cb;background:#f3fff5;color:#1f5f27;}
+
+    .formRow{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;}
+    .card{border:1px solid var(--border);background:#fff;border-radius:16px;padding:14px;}
+    .card h3{margin:0 0 6px;font-size:16px;color:#2a2550}
+    .card p{margin:0 0 10px;color:var(--muted);font-size:13px}
+    input,select{
+      width:100%;padding:10px 12px;border:1px solid var(--border);
+      border-radius:12px;font-size:14px;outline:none;
+    }
+    input:focus,select:focus{border-color:#b7bfe0;box-shadow:0 0 0 3px rgba(122,104,182,.12)}
+    .helpNote{
+      margin-top:10px;padding:10px 12px;border-left:4px solid var(--accent2);
+      background:#f7f6ff;border-radius:12px;color:#3a365a;
+      font-size:13px;line-height:1.35;
+    }
+    .bottombar{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
+      padding:16px;border-top:1px solid var(--border);background:#fff;
+    }
+    .progress{color:var(--muted);font-weight:800;font-size:13px;}
+    .tag{
+      display:inline-flex;gap:6px;align-items:center;
+      padding:7px 10px;border-radius:999px;border:1px solid var(--border);
+      background:#fff;font-weight:800;color:#2a2550;margin-right:8px;margin-bottom:8px;
+      font-size:13px;
+    }
+    .summary{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;}
+    @media (max-width: 980px){
+      .grid{grid-template-columns:repeat(3,minmax(0,1fr));}
+      .formRow{grid-template-columns:1fr;}
+      .summary{grid-template-columns:1fr;}
+      :root{--tile-h: 92px;}
+    }
+  </style>
+</head>
+
+<body>
+<div class="app">
+  <div class="chrome">
+    <div class="topbar">
+      <div class="left">
+        <button class="btn" id="backBtn"><span class="material-symbols-outlined">arrow_back</span>Go Back</button>
+        <button class="btn ghost" id="resetBtn"><span class="material-symbols-outlined">restart_alt</span>Reset</button>
+      </div>
+      <div class="right">
+        <span class="pill" id="destPill">
+          <span class="material-symbols-outlined">public</span>
+          Destination: <span id="destLabel">Not set</span>
+        </span>
+        <button class="btn" id="helpBtn">Help <span class="material-symbols-outlined">help</span></button>
+      </div>
+    </div>
+
+    <div class="content" id="screen"></div>
+
+    <div class="bottombar">
+      <button class="btn danger" id="cancelBtn"><span class="material-symbols-outlined">close</span>Cancel</button>
+      <div class="progress" id="progress">Step 1 of 7</div>
+      <button class="btn primary" id="nextBtn">Continue <span class="material-symbols-outlined">arrow_forward</span></button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------------------------
+   State
+---------------------------- */
+const state = {
+  step: 1,                // 1..7
+  weightG: "",
+  format: "",
+  destination: "",
+  prohibitedKey: null,    // if set -> hard stop message
+  restrictedKeys: new Set(),
+  coverLossOnlyKeys: new Set(),
+  coverNoCompKeys: new Set(),
+};
+
+/* ---------------------------
+   Data lists (your updated content)
+   - Prohibited: hard stop
+   - Restricted: allow with conditions (placeholder scaffold)
+   - Cover limits: Loss-only + No-comp (as provided)
+---------------------------- */
+
+// PROHIBITED (hard stop)
+const PROHIBITED = [
+  { key:"animals", label:"Animals / organisms", icon:"pets",
+    details:"Animals or organisms of any form cannot be carried on any service. Your order may be cancelled without notice." },
+
+  { key:"food_all", label:"Food (any type)", icon:"restaurant",
+    details:"All food items are prohibited (including non-perishable). Your order may be cancelled without notice." },
+
+  { key:"perishables", label:"Perishables", icon:"emoji_nature",
+    details:"Any perishable goods or perishable food are prohibited. Your order may be cancelled without notice." },
+
+  { key:"batteries", label:"Batteries (incl. built-in)", icon:"battery_alert",
+    details:"Batteries and items containing built-in batteries are prohibited on this service." },
+
+  { key:"bio_samples", label:"Biological samples", icon:"science",
+    details:"Biological samples are prohibited on this service." },
+
+  { key:"cylinders", label:"Compressed air / cylinders", icon:"propane_tank",
+    details:"Compressed air and empty cylinders are prohibited on this service." },
+
+  { key:"drugs_tobacco", label:"Drugs / meds / tobacco", icon:"medical_services",
+    details:"Drugs, medication, prescriptions, tobacco and tobacco products are prohibited on this service." },
+
+  { key:"hazardous", label:"Hazardous goods", icon:"warning",
+    details:"Hazardous goods are prohibited (incl. aerosol, asbestos, ashes, detergents, resin, explosives, filth, fire extinguishers, fireworks, gas, dry ice, alcohol, flammable/explosive substances)." },
+
+  { key:"illegal", label:"Illegal / counterfeit", icon:"gavel",
+    details:"Illegal goods are prohibited (incl. counterfeit goods/currency, or items illegal in exporting/importing country)." },
+
+  { key:"liquids_gels", label:"Liquids / creams / gels", icon:"water_drop",
+    details:"Liquids, creams, oils, wax or gels are prohibited on this service." },
+
+  { key:"medical_equipment", label:"Medical equipment", icon:"medical_information",
+    details:"Medical equipment is prohibited on this service." },
+
+  { key:"money_docs", label:"Money / financial docs", icon:"payments",
+    details:"Monetary/currency incl. cash, cards, coins, cheques, vouchers, tickets, lottery tickets, stamps (unless franked) and financial documents are prohibited." },
+
+  { key:"poisons", label:"Poisons / pesticides", icon:"pest_control",
+    details:"Poisonous/toxic liquids/solids/gases incl. pesticides are prohibited." },
+
+  { key:"radioactive", label:"Radioactive materials", icon:"radioactive",
+    details:"Radioactive materials are prohibited on this service." },
+
+  { key:"vehicle_parts_large", label:"Vehicle parts (large)", icon:"directions_car",
+    details:"Large vehicle parts are prohibited (incl. panels, spoilers, doors, bonnets, bumpers, carbon fibre, engines, any parts containing oil/liquids, airbags, seatbelt tensioners)." },
+
+  { key:"weapons", label:"Weapons / blades", icon:"dangerous",
+    details:"Weapons are prohibited (incl. replicas, ammunition, axes, blades, chainsaws, guns, knives etc.)." },
+
+  { key:"white_goods", label:"White goods", icon:"kitchen",
+    details:"White goods are prohibited (fridges, ovens, freezers, cooker hoods, hobs, boilers, washing machines, hot tubs etc.)." },
+
+  { key:"geochron", label:"Geochron", icon:"public",
+    details:"Geochron items are prohibited on this service." },
+];
+
+// RESTRICTED (allowed with conditions) — placeholders (swap with your real restricted catalogue)
+const RESTRICTED = [
+  { key:"lithium_in_device", label:"Lithium in a device", icon:"battery_alert",
+    details:"Lithium batteries may not be sent on their own, but can be allowable when included in a device, correctly packed and protected against damage/activation." },
+
+  { key:"aerosols_personal", label:"Personal aerosols", icon:"spray_can",
+    details:"Some aerosols may be allowable if within quantity limits and packed to prevent leakage/activation." },
+
+  { key:"cosmetics", label:"Cosmetics", icon:"spa",
+    details:"Some cosmetics may be allowable if non-flammable and packed to prevent leakage." },
+
+  { key:"liquids_small", label:"Liquids (small volumes)", icon:"water_drop",
+    details:"Some liquids may be allowable if under limits and packed with leak-proof inner packaging and absorbent material." },
+
+  { key:"perfume_small", label:"Perfume / aftershave", icon:"sanitizer",
+    details:"Perfume may be allowable only under specific limits and packaging rules. Check destination restrictions." },
+];
+
+// COVER LIMITS: Loss-only (refund if lost, not damage)
+const LOSS_ONLY = [
+  { key:"antiques", label:"Antiques (100+ yrs)", icon:"museum",
+    details:"Loss-only: not protected for damage. If lost, refund carriage + item value (parcel protection required)." },
+
+  { key:"wood_flooring", label:"Wooden flooring", icon:"grid_on",
+    details:"Loss-only: not protected for damage. If lost, refund carriage + item value (parcel protection required)." },
+
+  { key:"coffee_machines", label:"Coffee machines", icon:"coffee_maker",
+    details:"Loss-only: not protected for damage. If lost, refund carriage + item value (parcel protection required)." },
+
+  { key:"cycles", label:"Cycles", icon:"pedal_bike",
+    details:"Loss-only: not protected for damage. Max parcel protection for loss is £1,000." },
+
+  { key:"electrical_appliances", label:"Electrical appliances", icon:"devices",
+    details:"Loss-only: not protected for damage (e.g., cameras, monitors, computers, drones, lamps, laptops, scanners, TV, projector etc.)." },
+
+  { key:"fishing_rods", label:"Fishing rods", icon:"sports_and_outdoors",
+    details:"Loss-only: not protected for damage. If lost, refund carriage + item value (parcel protection required)." },
+
+  { key:"furniture", label:"Furniture", icon:"weekend",
+    details:"Loss-only: not protected for damage. If lost, refund carriage + item value (parcel protection required)." },
+
+  { key:"sewing_knitting", label:"Sewing/knitting machines", icon:"precision_manufacturing",
+    details:"Loss-only: not protected for damage. If lost, refund carriage + item value (parcel protection required)." },
+
+  { key:"models_kits", label:"Models / kits", icon:"view_in_ar",
+    details:"Loss-only: not protected for damage. If lost, refund carriage + item value (parcel protection required)." },
+
+  { key:"musical_instruments", label:"Musical instruments", icon:"music_note",
+    details:"Loss-only: not protected for damage. Must be sent in a hard case and boxed. Max parcel protection for loss is £1,000." },
+
+  { key:"suitcase_packaging", label:"Suitcase as packaging", icon:"luggage",
+    details:"Loss-only: suitcase not protected if used as packaging for internal items." },
+
+  { key:"surfboard", label:"Surfboard", icon:"surfing",
+    details:"Loss-only: not protected for damage. If lost, refund carriage + item value (parcel protection required)." },
+
+  { key:"telescopes", label:"Telescopes/microscopes", icon:"biotech",
+    details:"Loss-only: not protected for damage. If lost, refund carriage + item value (parcel protection required)." },
+
+  { key:"wall_decor", label:"Wall décor / frames", icon:"photo_frame",
+    details:"Loss-only: not protected for damage (canvas prints, clocks, framed pictures, posters, prints, paintings etc.)." },
+];
+
+// COVER LIMITS: No compensation (sender’s risk)
+const NO_COMP = [
+  { key:"ceramics_stone", label:"Ceramics / stone", icon:"category",
+    details:"No compensation: ceramics/porcelain/china/stone incl. tiles, sinks, basins, toilets, baths, crockery, granite, marble, vases, pottery, plates etc." },
+
+  { key:"glass", label:"Glass items", icon:"wine_bar",
+    details:"No compensation: glass of any type incl. glassware, crystal, bulbs, screens, fiberglass, fish tanks, mirrors, spectacles, windows, perspex." },
+
+  { key:"packaging", label:"Packaging", icon:"inventory_2",
+    details:"No compensation: packaging incl. box, media packaging, suitcases used as packaging." },
+
+  { key:"precious_metals", label:"Precious metals / gems", icon:"diamond",
+    details:"No compensation: gold, silver, gems, diamonds incl. jewellery form." },
+
+  { key:"small_vehicle_parts", label:"Small vehicle parts", icon:"build",
+    details:"No compensation: small vehicle parts incl. headlights, taillights, gearboxes." },
+
+  { key:"watches", label:"Watches", icon:"watch",
+    details:"No compensation: watches are carried at sender’s risk." },
+];
+
+/* ---------------------------
+   Helpers
+---------------------------- */
+function escapeHtml(s){
+  return (s||"").replace(/[&<>"']/g, m => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  }[m]));
+}
+function padTo25(list){
+  const out = [...list];
+  while(out.length < 25){
+    out.push({ key:`_blank_${out.length}`, label:"", icon:"block", details:"", blank:true });
+  }
+  return out.slice(0,25);
+}
+function setDestinationPill(){
+  const destLabel = document.getElementById("destLabel");
+  const pill = document.getElementById("destPill");
+  if(!state.destination){
+    destLabel.textContent = "Not set";
+    pill.style.opacity = 0.75;
+    return;
+  }
+  pill.style.opacity = 1;
+  destLabel.textContent = state.destination === "uk" ? "UK" : "International";
+}
+
+/* ---------------------------
+   Rendering
+---------------------------- */
+const screen = document.getElementById("screen");
+const progress = document.getElementById("progress");
+const nextBtn = document.getElementById("nextBtn");
+const backBtn = document.getElementById("backBtn");
+const resetBtn = document.getElementById("resetBtn");
+const cancelBtn = document.getElementById("cancelBtn");
+const helpBtn = document.getElementById("helpBtn");
+
+function stepCount(){ return 7; }
+
+function updateProgress(){
+  progress.textContent = `Step ${state.step} of ${stepCount()}`;
+  backBtn.disabled = (state.step === 1);
+}
+
+function render(){
+  setDestinationPill();
+  updateProgress();
+
+  if(state.step === 1) renderWeigh();
+  else if(state.step === 2) renderFormat();
+  else if(state.step === 3) renderDestination();
+  else if(state.step === 4) renderProhibited();
+  else if(state.step === 5) renderRestricted();
+  else if(state.step === 6) renderCoverLimits();
+  else renderSummary();
+
+  // CTA tweaks
+  if(state.step === 4){
+    nextBtn.innerHTML = `None of these <span class="material-symbols-outlined">arrow_forward</span>`;
+  } else {
+    nextBtn.innerHTML = `Continue <span class="material-symbols-outlined">arrow_forward</span>`;
+  }
+}
+
+function renderWeigh(){
+  screen.innerHTML = `
+    <div class="stepHeader">
+      <div>
+        <h1>Weigh your item</h1>
+        <p class="subtitle">Place the item on the scales. Enter weight for this prototype.</p>
+      </div>
+      <span class="pill"><span class="material-symbols-outlined">scale</span> Capture → Screen</span>
+    </div>
+
+    <div class="formRow">
+      <div class="card">
+        <h3>Weight (grams)</h3>
+        <p>In production this is captured automatically.</p>
+        <input id="weightInput" inputmode="numeric" placeholder="e.g. 350" value="${escapeHtml(state.weightG)}" />
+        <div class="helpNote">We collect weight and format first, then fail fast on prohibited items after destination.</div>
+      </div>
+      <div class="card">
+        <h3>Stakeholder note</h3>
+        <p>This prototype demonstrates destination-aware screening with minimal button presses.</p>
+        <div class="helpNote"><strong>No double-check step</strong> — customers can proceed via “None of these”.</div>
+      </div>
+    </div>
+  `;
+  document.getElementById("weightInput").addEventListener("input", (e)=> {
+    state.weightG = e.target.value.replace(/[^\d]/g,"").slice(0,6);
+    e.target.value = state.weightG;
+  });
+}
+
+function renderFormat(){
+  screen.innerHTML = `
+    <div class="stepHeader">
+      <div>
+        <h1>Confirm item format</h1>
+        <p class="subtitle">In production this is measured. Choose for this prototype.</p>
+      </div>
+      <span class="pill"><span class="material-symbols-outlined">straighten</span> Format</span>
+    </div>
+    <div class="formRow">
+      <div class="card">
+        <h3>Format</h3>
+        <p>Select the closest match.</p>
+        <select id="formatSel">
+          <option value="" ${state.format===""?"selected":""}>Choose…</option>
+          <option value="letter" ${state.format==="letter"?"selected":""}>Letter</option>
+          <option value="large_letter" ${state.format==="large_letter"?"selected":""}>Large letter</option>
+          <option value="parcel" ${state.format==="parcel"?"selected":""}>Parcel</option>
+        </select>
+        <div class="helpNote">Next: choose destination, then prohibited screening.</div>
+      </div>
+      <div class="card">
+        <h3>Why this matters</h3>
+        <p>Format influences services and sometimes restrictions.</p>
+        <div class="helpNote">We keep data capture steps consistent, then branch only when needed (destination rules).</div>
+      </div>
+    </div>
+  `;
+  document.getElementById("formatSel").addEventListener("change",(e)=> state.format = e.target.value);
+}
+
+function renderDestination(){
+  screen.innerHTML = `
+    <div class="stepHeader">
+      <div>
+        <h1>Select destination</h1>
+        <p class="subtitle">Destination determines prohibited / restricted rules.</p>
+      </div>
+      <span class="pill"><span class="material-symbols-outlined">public</span> Destination</span>
+    </div>
+    <div class="formRow">
+      <div class="card">
+        <h3>Where are you sending this?</h3>
+        <p>Choose for this prototype.</p>
+        <select id="destSel">
+          <option value="" ${state.destination===""?"selected":""}>Choose…</option>
+          <option value="uk" ${state.destination==="uk"?"selected":""}>UK (Inland)</option>
+          <option value="intl" ${state.destination==="intl"?"selected":""}>Overseas (International)</option>
+        </select>
+        <div class="helpNote">Next: prohibited items (fail fast).</div>
+      </div>
+      <div class="card">
+        <h3>Fail fast</h3>
+        <p>Prohibited selection stops the journey immediately.</p>
+        <div class="helpNote">Otherwise customers tap <strong>None of these</strong> and continue.</div>
+      </div>
+    </div>
+  `;
+  document.getElementById("destSel").addEventListener("change",(e)=> state.destination = e.target.value);
+}
+
+function renderProhibited(){
+  // In this Option 2 prototype: Prohibited list is service-wide (as you supplied).
+  // If later you need UK vs Intl variants, we can split here.
+  const list = padTo25(PROHIBITED);
+
+  screen.innerHTML = `
+    <div class="stepHeader">
+      <div>
+        <h1>Prohibited items</h1>
+        <p class="subtitle">Select any item that matches what you are sending.</p>
+      </div>
+      <span class="pill"><span class="material-symbols-outlined">block</span> Prohibited (hard stop)</span>
+    </div>
+
+    <div class="gridWrap">
+      <div class="grid" id="pGrid"></div>
+
+      <div class="details" id="pDetails">
+        <div class="detailsTop">
+          <div class="detailsTitle" id="pDetailsTitle"></div>
+          <button class="btn" id="pClose">
+            <span class="material-symbols-outlined">close</span>Close
+          </button>
+        </div>
+        <div class="detailsText" id="pDetailsText"></div>
+        <div class="banner danger show" id="pStopBanner">
+          This item cannot be carried on any service. Your order may be cancelled without notice.
+        </div>
+        <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn danger" id="pStopBack">
+            <span class="material-symbols-outlined">arrow_back</span>Go back
+          </button>
+          <button class="btn" id="pStopReset">
+            <span class="material-symbols-outlined">restart_alt</span>Start over
+          </button>
+        </div>
+      </div>
+
+      <div class="banner ok show" style="display:block; margin-top:14px;">
+        If none apply, press <strong>None of these</strong> to continue.
+      </div>
+    </div>
+  `;
+
+  const grid = document.getElementById("pGrid");
+  list.forEach(item => grid.appendChild(tileEl(item, "p")));
+
+  wireProhibitedDetails(list);
+}
+
+function renderRestricted(){
+  const list = padTo25(RESTRICTED);
+
+  screen.innerHTML = `
+    <div class="stepHeader">
+      <div>
+        <h1>Restricted goods</h1>
+        <p class="subtitle">Some items are allowed only if certain conditions are met. Select any that apply.</p>
+      </div>
+      <span class="pill"><span class="material-symbols-outlined">rule</span> Allowed with conditions</span>
+    </div>
+
+    <div class="gridWrap">
+      <div class="grid" id="rGrid"></div>
+
+      <div class="details" id="rDetails">
+        <div class="detailsTop">
+          <div class="detailsTitle" id="rDetailsTitle"></div>
+          <button class="btn" id="rClose"><span class="material-symbols-outlined">close</span>Close</button>
+        </div>
+        <div class="detailsText" id="rDetailsText"></div>
+        <div class="banner warn show" style="display:block; margin-top:10px;">
+          Selecting restricted items may change available services and packaging rules.
+        </div>
+      </div>
+
+      <div class="banner ok show" style="display:block; margin-top:14px;">
+        If none apply, press <strong>Continue</strong>.
+      </div>
+    </div>
+  `;
+
+  const grid = document.getElementById("rGrid");
+  list.forEach(item => grid.appendChild(tileEl(item, "r", true)));
+  wireMultiSelectDetails("r", list, state.restrictedKeys);
+}
+
+function renderCoverLimits(){
+  // Combine Loss-only and No-comp in one screen with a clear heading split.
+  const lossList = padTo25(LOSS_ONLY);
+  const noCompList = padTo25(NO_COMP);
+
+  screen.innerHTML = `
+    <div class="stepHeader">
+      <div>
+        <h1>Cover limits</h1>
+        <p class="subtitle">Some items are carried with limited or no protection. Select any that apply.</p>
+      </div>
+      <span class="pill"><span class="material-symbols-outlined">shield</span> Protection rules</span>
+    </div>
+
+    <div class="card" style="margin-bottom:14px;">
+      <h3>Loss-only items (not protected for damage)</h3>
+      <p>Select if your item matches any category below.</p>
+      <div class="gridWrap">
+        <div class="grid" id="lossGrid"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>No compensation items (sender’s risk)</h3>
+      <p>Select if your item matches any category below.</p>
+      <div class="gridWrap">
+        <div class="grid" id="ncGrid"></div>
+      </div>
+    </div>
+
+    <div class="details" id="cDetails">
+      <div class="detailsTop">
+        <div class="detailsTitle" id="cDetailsTitle"></div>
+        <button class="btn" id="cClose"><span class="material-symbols-outlined">close</span>Close</button>
+      </div>
+      <div class="detailsText" id="cDetailsText"></div>
+      <div class="banner warn show" style="display:block; margin-top:10px;">
+        This affects compensation eligibility. Protection may be limited or unavailable.
+      </div>
+    </div>
+  `;
+
+  const lossGrid = document.getElementById("lossGrid");
+  lossList.forEach(item => lossGrid.appendChild(tileEl(item, "loss", true)));
+  wireMultiSelectDetails("loss", lossList, state.coverLossOnlyKeys, "c");
+
+  const ncGrid = document.getElementById("ncGrid");
+  noCompList.forEach(item => ncGrid.appendChild(tileEl(item, "nc", true)));
+  wireMultiSelectDetails("nc", noCompList, state.coverNoCompKeys, "c");
+
+  // Use the shared cover details panel (cDetails)
+  document.getElementById("cClose").addEventListener("click", ()=> {
+    document.getElementById("cDetails").classList.remove("show");
+    document.querySelectorAll('.tile[data-mode="loss"], .tile[data-mode="nc"]').forEach(b=>b.classList.remove("selected"));
+  });
+}
+
+function renderSummary(){
+  const dest = state.destination === "uk" ? "UK" : (state.destination === "intl" ? "International" : "Not set");
+  const fmt = ({letter:"Letter", large_letter:"Large letter", parcel:"Parcel"})[state.format] || "Not set";
+
+  const restrictedLabels = [...state.restrictedKeys].map(k => RESTRICTED.find(x=>x.key===k)?.label).filter(Boolean);
+  const lossLabels = [...state.coverLossOnlyKeys].map(k => LOSS_ONLY.find(x=>x.key===k)?.label).filter(Boolean);
+  const ncLabels = [...state.coverNoCompKeys].map(k => NO_COMP.find(x=>x.key===k)?.label).filter(Boolean);
+
+  screen.innerHTML = `
+    <div class="stepHeader">
+      <div>
+        <h1>Summary</h1>
+        <p class="subtitle">Captured data and screening outcomes.</p>
+      </div>
+      <span class="pill"><span class="material-symbols-outlined">fact_check</span> Prototype end</span>
+    </div>
+
+    <div class="summary">
+      <div class="card">
+        <h3>Item details</h3>
+        <div style="margin-top:10px;">
+          <span class="tag"><span class="material-symbols-outlined">scale</span> ${escapeHtml(state.weightG || "—")} g</span>
+          <span class="tag"><span class="material-symbols-outlined">straighten</span> ${fmt}</span>
+          <span class="tag"><span class="material-symbols-outlined">public</span> ${dest}</span>
+        </div>
+        <div class="helpNote">Next in the real journey: product/service filtering & pricing.</div>
+      </div>
+
+      <div class="card">
+        <h3>Screening flags</h3>
+
+        ${state.prohibitedKey ? `
+          <div class="banner danger show" style="display:block;">
+            Prohibited selection was made: ${escapeHtml(PROHIBITED.find(x=>x.key===state.prohibitedKey)?.label || state.prohibitedKey)} (journey would stop).
+          </div>
+        ` : `
+          <div class="banner ok show" style="display:block;">
+            No prohibited items selected.
+          </div>
+        `}
+
+        <div style="margin-top:10px;">
+          <div class="helpNote">
+            <strong>Restricted:</strong> ${restrictedLabels.length ? escapeHtml(restrictedLabels.join(", ")) : "None"}<br/>
+            <strong>Loss-only:</strong> ${lossLabels.length ? escapeHtml(lossLabels.join(", ")) : "None"}<br/>
+            <strong>No-comp:</strong> ${ncLabels.length ? escapeHtml(ncLabels.join(", ")) : "None"}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* ---------------------------
+   Tile creation + wiring
+---------------------------- */
+function tileEl(item, mode, multi=false){
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "tile";
+  btn.dataset.key = item.key;
+  btn.dataset.mode = mode;
+  btn.dataset.multi = multi ? "1" : "0";
+
+  if(item.blank){
+    btn.style.visibility = "hidden";
+    btn.style.pointerEvents = "none";
+    return btn;
+  }
+  btn.innerHTML = `
+    <div class="icon"><span class="material-symbols-outlined">${item.icon || "block"}</span></div>
+    <div>
+      <div class="label">${escapeHtml(item.label)}</div>
+      <div class="hint">Tap for details</div>
+    </div>
+  `;
+  return btn;
+}
+
+// Prohibited: tap = immediate hard-stop panel (still shows details)
+function wireProhibitedDetails(list){
+  const details = document.getElementById("pDetails");
+  const title = document.getElementById("pDetailsTitle");
+  const text = document.getElementById("pDetailsText");
+  const close = document.getElementById("pClose");
+  const back = document.getElementById("pStopBack");
+  const reset = document.getElementById("pStopReset");
+
+  document.querySelectorAll('.tile[data-mode="p"]').forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const key = btn.dataset.key;
+      const item = list.find(x=>x.key===key);
+      if(!item) return;
+
+      state.prohibitedKey = key;
+
+      // highlight single
+      document.querySelectorAll('.tile[data-mode="p"]').forEach(b=>b.classList.remove("selected"));
+      btn.classList.add("selected");
+
+      title.innerHTML = `
+        <div class="icon"><span class="material-symbols-outlined">${item.icon || "block"}</span></div>
+        ${escapeHtml(item.label)}
+      `;
+      text.textContent = item.details || "";
+      details.classList.add("show");
+    });
+  });
+
+  close.addEventListener("click", ()=>{
+    state.prohibitedKey = null;
+    details.classList.remove("show");
+    document.querySelectorAll('.tile[data-mode="p"]').forEach(b=>b.classList.remove("selected"));
+  });
+  back.addEventListener("click", ()=>{ state.step = 3; render(); });
+  reset.addEventListener("click", ()=> resetAll());
+}
+
+// Multi-select tiles: tap toggles selection + opens details panel
+function wireMultiSelectDetails(mode, list, setRef, detailsMode="r"){
+  const details = document.getElementById(`${detailsMode}Details`) || document.getElementById("cDetails");
+  const title = document.getElementById(`${detailsMode}DetailsTitle`) || document.getElementById("cDetailsTitle");
+  const text = document.getElementById(`${detailsMode}DetailsText`) || document.getElementById("cDetailsText");
+  const close = document.getElementById(`${detailsMode}Close`) || document.getElementById("cClose");
+
+  document.querySelectorAll(`.tile[data-mode="${mode}"]`).forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const key = btn.dataset.key;
+      const item = list.find(x=>x.key===key);
+      if(!item) return;
+
+      if(setRef.has(key)) setRef.delete(key);
+      else setRef.add(key);
+
+      btn.classList.toggle("selected", setRef.has(key));
+
+      title.innerHTML = `
+        <div class="icon"><span class="material-symbols-outlined">${item.icon || "block"}</span></div>
+        ${escapeHtml(item.label)}
+      `;
+      text.textContent = item.details || "";
+      details.classList.add("show");
+    });
+  });
+
+  // Close handler is wired in renderRestricted / renderCoverLimits for shared panel cases
+}
+
+/* ---------------------------
+   Navigation rules
+---------------------------- */
+function canContinue(){
+  if(state.step === 1) return !!state.weightG;
+  if(state.step === 2) return !!state.format;
+  if(state.step === 3) return !!state.destination;
+
+  // Step 4: "None of these" means prohibitedKey must be null to proceed.
+  // If prohibited tile selected, we hard-stop and should not continue.
+  if(state.step === 4) return !state.prohibitedKey;
+
+  return true;
+}
+
+function next(){
+  if(!canContinue()){
+    alert("A prohibited item has been selected. In the live journey this would stop here.");
+    return;
+  }
+  if(state.step < stepCount()) state.step += 1;
+  render();
+}
+
+function back(){
+  if(state.step > 1) state.step -= 1;
+  render();
+}
+
+function resetAll(){
+  state.step = 1;
+  state.weightG = "";
+  state.format = "";
+  state.destination = "";
+  state.prohibitedKey = null;
+  state.restrictedKeys = new Set();
+  state.coverLossOnlyKeys = new Set();
+  state.coverNoCompKeys = new Set();
+  render();
+}
+
+/* ---------------------------
+   Hook up chrome buttons
+---------------------------- */
+document.getElementById("backBtn").addEventListener("click", back);
+document.getElementById("nextBtn").addEventListener("click", next);
+document.getElementById("resetBtn").addEventListener("click", resetAll);
+document.getElementById("cancelBtn").addEventListener("click", ()=> alert("Cancel – prototype action"));
+document.getElementById("helpBtn").addEventListener("click", ()=> alert("Help – prototype action"));
+
+render();
+</script>
+</body>
+</html>
