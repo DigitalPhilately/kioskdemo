@@ -101,7 +101,13 @@
       background:#f1effa;color:var(--accent);flex:0 0 auto;
       overflow:hidden;
     }
-    .tile .icon .material-symbols-outlined{font-size:30px;}
+    .tile .icon .material-symbols-outlined{
+      font-size:30px;
+      display:block;
+      max-width:1em;
+      overflow:hidden;
+      white-space:nowrap;
+    }
     .tile .label{font-weight:900;font-size:14px;line-height:1.15;}
     .tile.selected{border-color:var(--accent2);box-shadow:0 0 0 3px rgba(122,104,182,.18);}
     .details{
@@ -116,6 +122,14 @@
     .detailsTitle .icon{
       width:36px;height:36px;border-radius:12px;background:#f1effa;
       display:flex;align-items:center;justify-content:center;color:var(--accent);
+      overflow:hidden;
+    }
+    .detailsTitle .icon .material-symbols-outlined{
+      font-size:22px;
+      display:block;
+      max-width:1em;
+      overflow:hidden;
+      white-space:nowrap;
     }
     .detailsText{margin-top:10px;color:#293047;line-height:1.35;}
     .banner{
@@ -274,7 +288,7 @@ const RESTRICTED = [
   { key:"lithium_in_device", label:"Lithium in a device", icon:"battery_alert",
     details:"Lithium batteries may not be sent on their own, but can be allowable when included in a device, correctly packed and protected against damage/activation." },
 
-  { key:"aerosols_personal", label:"Personal aerosols", icon:"spray_can",
+  { key:"aerosols_personal", label:"Personal aerosols", icon:"air",
     details:"Some aerosols may be allowable if within quantity limits and packed to prevent leakage/activation." },
 
   { key:"cosmetics", label:"Cosmetics", icon:"spa",
