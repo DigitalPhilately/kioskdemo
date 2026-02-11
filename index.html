@@ -25,7 +25,7 @@
       --ok:#2e7d32;
       --shadow: 0 8px 18px rgba(19,33,68,.10);
       --radius: 14px;
-      --tile-h: 86px;
+      --tile-h: 104px;
     }
     *{box-sizing:border-box}
     body{
@@ -86,11 +86,12 @@
     }
     .grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;}
     .tile{
-      height:var(--tile-h);
+      min-height:var(--tile-h);
+      height:auto;
       border:1px solid var(--border);
       background:#fff;border-radius:14px;
-      display:flex;align-items:center;gap:12px;
-      padding:10px 12px;cursor:pointer;
+      display:flex;align-items:flex-start;gap:12px;
+      padding:12px;cursor:pointer;
       box-shadow:0 2px 0 rgba(0,0,0,.02);
       text-align:left;
     }
@@ -108,7 +109,7 @@
       overflow:hidden;
       white-space:nowrap;
     }
-    .tile .label{font-weight:900;font-size:14px;line-height:1.15;}
+    .tile .label{font-weight:900;font-size:13px;line-height:1.2;overflow-wrap:anywhere;word-break:break-word;}
     .tile.selected{border-color:var(--accent2);box-shadow:0 0 0 3px rgba(122,104,182,.18);}
     .details{
       margin-top:0;border:1px solid var(--border);
@@ -165,6 +166,7 @@
       gap:4px;
     }
     .choiceBtn .sub{font-size:12px;color:var(--muted);font-weight:700}
+    .choiceBtn span{overflow-wrap:anywhere;word-break:break-word;line-height:1.2}
     .choiceBtn.active{
       border-color:var(--accent2);
       box-shadow:0 0 0 3px rgba(122,104,182,.18);
@@ -193,11 +195,15 @@
     }
     .summary{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;}
     @media (max-width: 980px){
-      .grid{grid-template-columns:repeat(3,minmax(0,1fr));}
+      .grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;}
       .formRow{grid-template-columns:1fr;}
       .summary{grid-template-columns:1fr;}
       .choiceRow3{grid-template-columns:1fr;}
-      :root{--tile-h: 92px;}
+      .tile{padding:10px;}
+      .tile .icon{width:46px;height:46px;border-radius:12px;}
+      .tile .icon .material-symbols-outlined{font-size:24px;}
+      .tile .label{font-size:12px;}
+      :root{--tile-h: 90px;}
     }
   </style>
 </head>
@@ -431,7 +437,7 @@ const resetBtn = document.getElementById("resetBtn");
 const cancelBtn = document.getElementById("cancelBtn");
 const helpBtn = document.getElementById("helpBtn");
 
-function stepCount(){ return 5; }
+function stepCount(){ return 4; }
 
 function updateProgress(){
   progress.textContent = `Step ${state.step} of ${stepCount()}`;
@@ -444,8 +450,7 @@ function render(){
 
   if(state.step === 1) renderWeigh();
   else if(state.step === 2) renderProhibited();
-  else if(state.step === 3) renderRestricted();
-  else if(state.step === 4) renderCoverLimits();
+  else if(state.step === 3) renderPolicyChecks();
   else renderSummary();
 
   nextBtn.innerHTML = `Continue <span class="material-symbols-outlined">arrow_forward</span>`;
@@ -466,7 +471,7 @@ function renderWeigh(){
         <h3>Weight (grams)</h3>
         <p>In production this is captured automatically.</p>
         <input id="weightInput" inputmode="numeric" placeholder="e.g. 350" value="${escapeHtml(state.weightG)}" />
-        <div class="helpNote">Next step confirms format, then we run dangerous goods checks.</div>
+        <div class="helpNote">Next step is the prohibited items check.</div>
       </div>
       <div class="card">
         <h3>Destination and size</h3>
@@ -573,55 +578,36 @@ function renderProhibited(){
   wireProhibitedDetails(list);
 }
 
-function renderRestricted(){
-  const list = padTo25(RESTRICTED);
-
-  screen.innerHTML = `
-    <div class="stepHeader">
-      <div>
-        <h1>Restricted goods</h1>
-        <p class="subtitle">Some items are allowed only if certain conditions are met. Select any that apply.</p>
-      </div>
-      <span class="pill"><span class="material-symbols-outlined">rule</span> Allowed with conditions</span>
-    </div>
-
-    <div class="gridWrap">
-      <div class="grid" id="rGrid"></div>
-
-      <div class="details" id="rDetails">
-        <div class="detailsTop">
-          <div class="detailsTitle" id="rDetailsTitle"></div>
-          <button class="btn" id="rClose"><span class="material-symbols-outlined">close</span>Close</button>
-        </div>
-        <div class="detailsText" id="rDetailsText"></div>
-        <div class="banner warn show" style="display:block; margin-top:10px;">
-          Selecting restricted items may change available services and packaging rules.
-        </div>
-      </div>
-
-      <div class="banner ok show" style="display:block; margin-top:14px;">
-        If none apply, press <strong>Continue</strong>.
-      </div>
-    </div>
-  `;
-
-  const grid = document.getElementById("rGrid");
-  list.forEach(item => grid.appendChild(tileEl(item, "r", true)));
-  wireMultiSelectDetails("r", list, state.restrictedKeys);
-}
-
-function renderCoverLimits(){
-  // Combine Loss-only and No-comp in one screen with a clear heading split.
+function renderPolicyChecks(){
+  const restrictedList = padTo25(RESTRICTED);
   const lossList = padTo25(LOSS_ONLY);
   const noCompList = padTo25(NO_COMP);
 
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Compensation policy</h1>
+        <h1>Restricted and compensation checks</h1>
         <p class="subtitle">Select any categories that match your item.</p>
       </div>
       <span class="pill"><span class="material-symbols-outlined">shield</span> Protection rules</span>
+    </div>
+
+    <div class="card" style="margin-bottom:14px;">
+      <h3>Restricted goods (allowed with conditions)</h3>
+      <p>Some items are allowed only if specific conditions are met.</p>
+      <div class="gridWrap">
+        <div class="grid" id="rGrid"></div>
+        <div class="details" id="rDetails">
+          <div class="detailsTop">
+            <div class="detailsTitle" id="rDetailsTitle"></div>
+            <button class="btn" id="rClose"><span class="material-symbols-outlined">close</span>Close</button>
+          </div>
+          <div class="detailsText" id="rDetailsText"></div>
+          <div class="banner warn show" style="display:block; margin-top:10px;">
+            Restricted items may change service availability and packing requirements.
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="card" style="margin-bottom:14px;">
@@ -652,6 +638,10 @@ function renderCoverLimits(){
     </div>
   `;
 
+  const rGrid = document.getElementById("rGrid");
+  restrictedList.forEach(item => rGrid.appendChild(tileEl(item, "r", true)));
+  wireMultiSelectDetails("r", restrictedList, state.restrictedKeys);
+
   const lossGrid = document.getElementById("lossGrid");
   lossList.forEach(item => lossGrid.appendChild(tileEl(item, "loss", true)));
   wireMultiSelectDetails("loss", lossList, state.coverLossOnlyKeys, "c");
@@ -664,6 +654,10 @@ function renderCoverLimits(){
   document.getElementById("cClose").addEventListener("click", ()=> {
     document.getElementById("cDetails").classList.remove("show");
     document.querySelectorAll('.tile[data-mode="loss"], .tile[data-mode="nc"]').forEach(b=>b.classList.remove("selected"));
+  });
+  document.getElementById("rClose").addEventListener("click", ()=> {
+    document.getElementById("rDetails").classList.remove("show");
+    document.querySelectorAll('.tile[data-mode="r"]').forEach(b=>b.classList.remove("selected"));
   });
 }
 
