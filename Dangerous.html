@@ -145,6 +145,31 @@
     .card{border:1px solid var(--border);background:#fff;border-radius:16px;padding:14px;}
     .card h3{margin:0 0 6px;font-size:16px;color:#2a2550}
     .card p{margin:0 0 10px;color:var(--muted);font-size:13px}
+    .choiceGroup{display:grid;gap:10px}
+    .choiceRow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .choiceRow3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .choiceBtn{
+      border:1px solid var(--border);
+      background:#fff;
+      color:var(--text);
+      border-radius:12px;
+      padding:12px 10px;
+      text-align:center;
+      cursor:pointer;
+      font-weight:900;
+      min-height:62px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:4px;
+    }
+    .choiceBtn .sub{font-size:12px;color:var(--muted);font-weight:700}
+    .choiceBtn.active{
+      border-color:var(--accent2);
+      box-shadow:0 0 0 3px rgba(122,104,182,.18);
+      background:#fbf9ff;
+    }
     input,select{
       width:100%;padding:10px 12px;border:1px solid var(--border);
       border-radius:12px;font-size:14px;outline:none;
@@ -171,6 +196,7 @@
       .grid{grid-template-columns:repeat(3,minmax(0,1fr));}
       .formRow{grid-template-columns:1fr;}
       .summary{grid-template-columns:1fr;}
+      .choiceRow3{grid-template-columns:1fr;}
       :root{--tile-h: 92px;}
     }
   </style>
@@ -445,18 +471,30 @@ function renderWeigh(){
       <div class="card">
         <h3>Destination and size</h3>
         <p>Where are you sending this?</p>
-        <select id="destSel">
-          <option value="" ${state.destination===""?"selected":""}>Choose…</option>
-          <option value="uk" ${state.destination==="uk"?"selected":""}>UK (Inland)</option>
-          <option value="intl" ${state.destination==="intl"?"selected":""}>Overseas (International)</option>
-        </select>
+        <div class="choiceGroup">
+          <div class="choiceRow" id="destChoices">
+            <button type="button" class="choiceBtn ${state.destination==="uk"?"active":""}" data-value="uk">
+              <span>🇬🇧 UK</span>
+              <span class="sub">Inland</span>
+            </button>
+            <button type="button" class="choiceBtn ${state.destination==="intl"?"active":""}" data-value="intl">
+              <span>🌍 International</span>
+              <span class="sub">Overseas</span>
+            </button>
+          </div>
+        </div>
         <p style="margin:10px 0 8px;color:var(--muted);font-size:13px;">What size is your item?</p>
-        <select id="formatSel">
-          <option value="" ${state.format===""?"selected":""}>Choose…</option>
-          <option value="letter" ${state.format==="letter"?"selected":""}>Letter</option>
-          <option value="large_letter" ${state.format==="large_letter"?"selected":""}>Large letter</option>
-          <option value="parcel" ${state.format==="parcel"?"selected":""}>Parcel</option>
-        </select>
+        <div class="choiceRow3" id="formatChoices">
+          <button type="button" class="choiceBtn ${state.format==="letter"?"active":""}" data-value="letter">
+            <span>Letter</span>
+          </button>
+          <button type="button" class="choiceBtn ${state.format==="large_letter"?"active":""}" data-value="large_letter">
+            <span>Large Letter</span>
+          </button>
+          <button type="button" class="choiceBtn ${state.format==="parcel"?"active":""}" data-value="parcel">
+            <span>Parcel</span>
+          </button>
+        </div>
         <div class="helpNote">Destination determines restricted and prohibited rules.</div>
       </div>
     </div>
@@ -465,8 +503,19 @@ function renderWeigh(){
     state.weightG = e.target.value.replace(/[^\d]/g,"").slice(0,6);
     e.target.value = state.weightG;
   });
-  document.getElementById("destSel").addEventListener("change",(e)=> state.destination = e.target.value);
-  document.getElementById("formatSel").addEventListener("change",(e)=> state.format = e.target.value);
+  document.querySelectorAll("#destChoices .choiceBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.destination = btn.dataset.value || "";
+      document.querySelectorAll("#destChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
+      setDestinationPill();
+    });
+  });
+  document.querySelectorAll("#formatChoices .choiceBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.format = btn.dataset.value || "";
+      document.querySelectorAll("#formatChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
+    });
+  });
 }
 
 function renderProhibited(){
