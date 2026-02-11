@@ -97,6 +97,7 @@
       width:44px;height:44px;border-radius:12px;
       display:flex;align-items:center;justify-content:center;
       background:#f1effa;color:var(--accent);flex:0 0 auto;
+      overflow:hidden;
     }
     .tile .label{font-weight:900;font-size:14px;line-height:1.15;}
     .tile .hint{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.1;}
@@ -247,7 +248,7 @@ const PROHIBITED = [
   { key:"poisons", label:"Poisons / pesticides", icon:"pest_control",
     details:"Poisonous/toxic liquids/solids/gases incl. pesticides are prohibited." },
 
-  { key:"radioactive", label:"Radioactive materials", icon:"radioactive",
+  { key:"radioactive", label:"Radioactive materials", icon:"dangerous",
     details:"Radioactive materials are prohibited on this service." },
 
   { key:"vehicle_parts_large", label:"Vehicle parts (large)", icon:"directions_car",
