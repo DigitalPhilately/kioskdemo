@@ -194,7 +194,7 @@
    State
 ---------------------------- */
 const state = {
-  step: 1,                // 1..6
+  step: 1,                // 1..5
   weightG: "",
   format: "",
   destination: "",
@@ -391,7 +391,7 @@ const resetBtn = document.getElementById("resetBtn");
 const cancelBtn = document.getElementById("cancelBtn");
 const helpBtn = document.getElementById("helpBtn");
 
-function stepCount(){ return 6; }
+function stepCount(){ return 5; }
 
 function updateProgress(){
   progress.textContent = `Step ${state.step} of ${stepCount()}`;
@@ -403,10 +403,9 @@ function render(){
   updateProgress();
 
   if(state.step === 1) renderWeigh();
-  else if(state.step === 2) renderFormat();
-  else if(state.step === 3) renderProhibited();
-  else if(state.step === 4) renderRestricted();
-  else if(state.step === 5) renderCoverLimits();
+  else if(state.step === 2) renderProhibited();
+  else if(state.step === 3) renderRestricted();
+  else if(state.step === 4) renderCoverLimits();
   else renderSummary();
 
   nextBtn.innerHTML = `Continue <span class="material-symbols-outlined">arrow_forward</span>`;
@@ -417,9 +416,9 @@ function renderWeigh(){
     <div class="stepHeader">
       <div>
         <h1>Item details</h1>
-        <p class="subtitle">Enter weight and destination in one step.</p>
+        <p class="subtitle">Enter weight, size and destination in one step.</p>
       </div>
-      <span class="pill"><span class="material-symbols-outlined">scale</span> Weight + Destination</span>
+      <span class="pill"><span class="material-symbols-outlined">scale</span> Weight + Size + Destination</span>
     </div>
 
     <div class="formRow">
@@ -430,12 +429,19 @@ function renderWeigh(){
         <div class="helpNote">Next step confirms format, then we run dangerous goods checks.</div>
       </div>
       <div class="card">
-        <h3>Destination</h3>
+        <h3>Destination and size</h3>
         <p>Where are you sending this?</p>
         <select id="destSel">
           <option value="" ${state.destination===""?"selected":""}>Choose…</option>
           <option value="uk" ${state.destination==="uk"?"selected":""}>UK (Inland)</option>
           <option value="intl" ${state.destination==="intl"?"selected":""}>Overseas (International)</option>
+        </select>
+        <p style="margin:10px 0 8px;color:var(--muted);font-size:13px;">What size is your item?</p>
+        <select id="formatSel">
+          <option value="" ${state.format===""?"selected":""}>Choose…</option>
+          <option value="letter" ${state.format==="letter"?"selected":""}>Letter</option>
+          <option value="large_letter" ${state.format==="large_letter"?"selected":""}>Large letter</option>
+          <option value="parcel" ${state.format==="parcel"?"selected":""}>Parcel</option>
         </select>
         <div class="helpNote">Destination determines restricted and prohibited rules.</div>
       </div>
@@ -446,36 +452,6 @@ function renderWeigh(){
     e.target.value = state.weightG;
   });
   document.getElementById("destSel").addEventListener("change",(e)=> state.destination = e.target.value);
-}
-
-function renderFormat(){
-  screen.innerHTML = `
-    <div class="stepHeader">
-      <div>
-        <h1>Confirm item format</h1>
-        <p class="subtitle">In production this is measured. Choose for this prototype.</p>
-      </div>
-      <span class="pill"><span class="material-symbols-outlined">straighten</span> Format</span>
-    </div>
-    <div class="formRow">
-      <div class="card">
-        <h3>Format</h3>
-        <p>Select the closest match.</p>
-        <select id="formatSel">
-          <option value="" ${state.format===""?"selected":""}>Choose…</option>
-          <option value="letter" ${state.format==="letter"?"selected":""}>Letter</option>
-          <option value="large_letter" ${state.format==="large_letter"?"selected":""}>Large letter</option>
-          <option value="parcel" ${state.format==="parcel"?"selected":""}>Parcel</option>
-        </select>
-        <div class="helpNote">Next: dangerous goods check.</div>
-      </div>
-      <div class="card">
-        <h3>Why this matters</h3>
-        <p>Format influences services and sometimes restrictions.</p>
-        <div class="helpNote">We keep data capture steps consistent, then branch only when needed (destination rules).</div>
-      </div>
-    </div>
-  `;
   document.getElementById("formatSel").addEventListener("change",(e)=> state.format = e.target.value);
 }
 
@@ -750,7 +726,7 @@ function wireProhibitedDetails(list){
     details.classList.remove("show");
     document.querySelectorAll('.tile[data-mode="p"]').forEach(b=>b.classList.remove("selected"));
   });
-  back.addEventListener("click", ()=>{ state.step = 2; render(); });
+  back.addEventListener("click", ()=>{ state.step = 1; render(); });
   reset.addEventListener("click", ()=> resetAll());
 }
 
@@ -788,23 +764,22 @@ function wireMultiSelectDetails(mode, list, setRef, detailsMode="r"){
    Navigation rules
 ---------------------------- */
 function canContinue(){
-  if(state.step === 1) return !!state.weightG && !!state.destination;
-  if(state.step === 2) return !!state.format;
+  if(state.step === 1) return !!state.weightG && !!state.destination && !!state.format;
 
-  // Step 3 requires explicit acknowledgement via "Other / not listed".
+  // Step 2 requires explicit acknowledgement via "Other / not listed".
   // If a prohibited tile is selected, this stays blocked.
-  if(state.step === 3) return state.prohibitedOtherSelected && !state.prohibitedKey;
+  if(state.step === 2) return state.prohibitedOtherSelected && !state.prohibitedKey;
 
   return true;
 }
 
 function next(){
   if(!canContinue()){
-    if(state.step === 3 && state.prohibitedKey){
+    if(state.step === 2 && state.prohibitedKey){
       alert("A prohibited item has been selected. In the live journey this would stop here.");
       return;
     }
-    if(state.step === 3){
+    if(state.step === 2){
       alert("Please select 'Other / not listed' to confirm your item is not shown.");
       return;
     }
