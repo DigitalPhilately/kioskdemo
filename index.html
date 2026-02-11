@@ -190,11 +190,12 @@
    State
 ---------------------------- */
 const state = {
-  step: 1,                // 1..7
+  step: 1,                // 1..6
   weightG: "",
   format: "",
   destination: "",
   prohibitedKey: null,    // if set -> hard stop message
+  prohibitedOtherSelected: false,
   restrictedKeys: new Set(),
   coverLossOnlyKeys: new Set(),
   coverNoCompKeys: new Set(),
@@ -386,7 +387,7 @@ const resetBtn = document.getElementById("resetBtn");
 const cancelBtn = document.getElementById("cancelBtn");
 const helpBtn = document.getElementById("helpBtn");
 
-function stepCount(){ return 7; }
+function stepCount(){ return 6; }
 
 function updateProgress(){
   progress.textContent = `Step ${state.step} of ${stepCount()}`;
@@ -399,28 +400,22 @@ function render(){
 
   if(state.step === 1) renderWeigh();
   else if(state.step === 2) renderFormat();
-  else if(state.step === 3) renderDestination();
-  else if(state.step === 4) renderProhibited();
-  else if(state.step === 5) renderRestricted();
-  else if(state.step === 6) renderCoverLimits();
+  else if(state.step === 3) renderProhibited();
+  else if(state.step === 4) renderRestricted();
+  else if(state.step === 5) renderCoverLimits();
   else renderSummary();
 
-  // CTA tweaks
-  if(state.step === 4){
-    nextBtn.innerHTML = `None of these <span class="material-symbols-outlined">arrow_forward</span>`;
-  } else {
-    nextBtn.innerHTML = `Continue <span class="material-symbols-outlined">arrow_forward</span>`;
-  }
+  nextBtn.innerHTML = `Continue <span class="material-symbols-outlined">arrow_forward</span>`;
 }
 
 function renderWeigh(){
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Weigh your item</h1>
-        <p class="subtitle">Place the item on the scales. Enter weight for this prototype.</p>
+        <h1>Item details</h1>
+        <p class="subtitle">Enter weight and destination in one step.</p>
       </div>
-      <span class="pill"><span class="material-symbols-outlined">scale</span> Capture → Screen</span>
+      <span class="pill"><span class="material-symbols-outlined">scale</span> Weight + Destination</span>
     </div>
 
     <div class="formRow">
@@ -428,12 +423,17 @@ function renderWeigh(){
         <h3>Weight (grams)</h3>
         <p>In production this is captured automatically.</p>
         <input id="weightInput" inputmode="numeric" placeholder="e.g. 350" value="${escapeHtml(state.weightG)}" />
-        <div class="helpNote">We collect weight and format first, then fail fast on prohibited items after destination.</div>
+        <div class="helpNote">Next step confirms format, then we run dangerous goods checks.</div>
       </div>
       <div class="card">
-        <h3>Stakeholder note</h3>
-        <p>This prototype demonstrates destination-aware screening with minimal button presses.</p>
-        <div class="helpNote"><strong>No double-check step</strong> — customers can proceed via “None of these”.</div>
+        <h3>Destination</h3>
+        <p>Where are you sending this?</p>
+        <select id="destSel">
+          <option value="" ${state.destination===""?"selected":""}>Choose…</option>
+          <option value="uk" ${state.destination==="uk"?"selected":""}>UK (Inland)</option>
+          <option value="intl" ${state.destination==="intl"?"selected":""}>Overseas (International)</option>
+        </select>
+        <div class="helpNote">Destination determines restricted and prohibited rules.</div>
       </div>
     </div>
   `;
@@ -441,6 +441,7 @@ function renderWeigh(){
     state.weightG = e.target.value.replace(/[^\d]/g,"").slice(0,6);
     e.target.value = state.weightG;
   });
+  document.getElementById("destSel").addEventListener("change",(e)=> state.destination = e.target.value);
 }
 
 function renderFormat(){
@@ -462,7 +463,7 @@ function renderFormat(){
           <option value="large_letter" ${state.format==="large_letter"?"selected":""}>Large letter</option>
           <option value="parcel" ${state.format==="parcel"?"selected":""}>Parcel</option>
         </select>
-        <div class="helpNote">Next: choose destination, then prohibited screening.</div>
+        <div class="helpNote">Next: dangerous goods check.</div>
       </div>
       <div class="card">
         <h3>Why this matters</h3>
@@ -474,46 +475,24 @@ function renderFormat(){
   document.getElementById("formatSel").addEventListener("change",(e)=> state.format = e.target.value);
 }
 
-function renderDestination(){
-  screen.innerHTML = `
-    <div class="stepHeader">
-      <div>
-        <h1>Select destination</h1>
-        <p class="subtitle">Destination determines prohibited / restricted rules.</p>
-      </div>
-      <span class="pill"><span class="material-symbols-outlined">public</span> Destination</span>
-    </div>
-    <div class="formRow">
-      <div class="card">
-        <h3>Where are you sending this?</h3>
-        <p>Choose for this prototype.</p>
-        <select id="destSel">
-          <option value="" ${state.destination===""?"selected":""}>Choose…</option>
-          <option value="uk" ${state.destination==="uk"?"selected":""}>UK (Inland)</option>
-          <option value="intl" ${state.destination==="intl"?"selected":""}>Overseas (International)</option>
-        </select>
-        <div class="helpNote">Next: prohibited items (fail fast).</div>
-      </div>
-      <div class="card">
-        <h3>Fail fast</h3>
-        <p>Prohibited selection stops the journey immediately.</p>
-        <div class="helpNote">Otherwise customers tap <strong>None of these</strong> and continue.</div>
-      </div>
-    </div>
-  `;
-  document.getElementById("destSel").addEventListener("change",(e)=> state.destination = e.target.value);
-}
-
 function renderProhibited(){
   // In this Option 2 prototype: Prohibited list is service-wide (as you supplied).
   // If later you need UK vs Intl variants, we can split here.
-  const list = padTo25(PROHIBITED);
+  const list = padTo25([
+    ...PROHIBITED,
+    {
+      key:"other_not_listed",
+      label:"Other / not listed",
+      icon:"check_circle",
+      details:"Select this if your item does not match any option above. You can then continue."
+    }
+  ]);
 
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Prohibited items</h1>
-        <p class="subtitle">Select any item that matches what you are sending.</p>
+        <h1>Dangerous goods check</h1>
+        <p class="subtitle"><strong>DOES your item contain any of the following?</strong> Select one option.</p>
       </div>
       <span class="pill"><span class="material-symbols-outlined">block</span> Prohibited (hard stop)</span>
     </div>
@@ -543,7 +522,7 @@ function renderProhibited(){
       </div>
 
       <div class="banner ok show" style="display:block; margin-top:14px;">
-        If none apply, press <strong>None of these</strong> to continue.
+        If none apply, select <strong>Other / not listed</strong> to continue.
       </div>
     </div>
   `;
@@ -742,11 +721,19 @@ function wireProhibitedDetails(list){
       const item = list.find(x=>x.key===key);
       if(!item) return;
 
-      state.prohibitedKey = key;
-
       // highlight single
       document.querySelectorAll('.tile[data-mode="p"]').forEach(b=>b.classList.remove("selected"));
       btn.classList.add("selected");
+
+      if(key === "other_not_listed"){
+        state.prohibitedKey = null;
+        state.prohibitedOtherSelected = true;
+        details.classList.remove("show");
+        return;
+      }
+
+      state.prohibitedOtherSelected = false;
+      state.prohibitedKey = key;
 
       title.innerHTML = `
         <div class="icon"><span class="material-symbols-outlined">${item.icon || "block"}</span></div>
@@ -759,10 +746,11 @@ function wireProhibitedDetails(list){
 
   close.addEventListener("click", ()=>{
     state.prohibitedKey = null;
+    state.prohibitedOtherSelected = false;
     details.classList.remove("show");
     document.querySelectorAll('.tile[data-mode="p"]').forEach(b=>b.classList.remove("selected"));
   });
-  back.addEventListener("click", ()=>{ state.step = 3; render(); });
+  back.addEventListener("click", ()=>{ state.step = 2; render(); });
   reset.addEventListener("click", ()=> resetAll());
 }
 
@@ -800,20 +788,27 @@ function wireMultiSelectDetails(mode, list, setRef, detailsMode="r"){
    Navigation rules
 ---------------------------- */
 function canContinue(){
-  if(state.step === 1) return !!state.weightG;
+  if(state.step === 1) return !!state.weightG && !!state.destination;
   if(state.step === 2) return !!state.format;
-  if(state.step === 3) return !!state.destination;
 
-  // Step 4: "None of these" means prohibitedKey must be null to proceed.
-  // If prohibited tile selected, we hard-stop and should not continue.
-  if(state.step === 4) return !state.prohibitedKey;
+  // Step 3 requires explicit acknowledgement via "Other / not listed".
+  // If a prohibited tile is selected, this stays blocked.
+  if(state.step === 3) return state.prohibitedOtherSelected && !state.prohibitedKey;
 
   return true;
 }
 
 function next(){
   if(!canContinue()){
-    alert("A prohibited item has been selected. In the live journey this would stop here.");
+    if(state.step === 3 && state.prohibitedKey){
+      alert("A prohibited item has been selected. In the live journey this would stop here.");
+      return;
+    }
+    if(state.step === 3){
+      alert("Please select 'Other / not listed' to confirm your item is not shown.");
+      return;
+    }
+    alert("Please complete this step before continuing.");
     return;
   }
   if(state.step < stepCount()) state.step += 1;
@@ -831,6 +826,7 @@ function resetAll(){
   state.format = "";
   state.destination = "";
   state.prohibitedKey = null;
+  state.prohibitedOtherSelected = false;
   state.restrictedKeys = new Set();
   state.coverLossOnlyKeys = new Set();
   state.coverNoCompKeys = new Set();
