@@ -255,58 +255,58 @@ const state = {
 // PROHIBITED (hard stop)
 const PROHIBITED = [
   { key:"animals", label:"Animals / organisms", icon:"pets",
-    details:"Animals or organisms of any form cannot be carried on any service. Your order may be cancelled without notice." },
+    details:"Animals or organisms of any form cannot be carried on any service." },
 
   { key:"food_all", label:"Food (any type)", icon:"restaurant",
-    details:"All food items are prohibited (including non-perishable). Your order may be cancelled without notice." },
+    details:"Food items of any type cannot be carried, including non-perishable food." },
 
   { key:"perishables", label:"Perishables", icon:"emoji_nature",
-    details:"Any perishable goods or perishable food are prohibited. Your order may be cancelled without notice." },
+    details:"Any perishable goods or perishable food cannot be carried on any service." },
 
   { key:"batteries", label:"Batteries (incl. built-in)", icon:"battery_alert",
-    details:"Batteries and items containing built-in batteries are prohibited on this service." },
+    details:"Batteries and items containing built-in batteries cannot be carried on any service." },
 
   { key:"bio_samples", label:"Biological samples", icon:"science",
-    details:"Biological samples are prohibited on this service." },
+    details:"Biological samples cannot be carried on any service." },
 
   { key:"cylinders", label:"Compressed air / cylinders", icon:"propane_tank",
-    details:"Compressed air and empty cylinders are prohibited on this service." },
+    details:"Compressed air and empty cylinders cannot be carried on any service." },
 
   { key:"drugs_tobacco", label:"Drugs / meds / tobacco", icon:"medical_services",
-    details:"Drugs, medication, prescriptions, tobacco and tobacco products are prohibited on this service." },
+    details:"Drugs, medication, prescriptions, tobacco, and tobacco products cannot be carried on any service." },
 
   { key:"hazardous", label:"Hazardous goods", icon:"warning",
-    details:"Hazardous goods are prohibited (incl. aerosol, asbestos, ashes, detergents, resin, explosives, filth, fire extinguishers, fireworks, gas, dry ice, alcohol, flammable/explosive substances)." },
+    details:"Hazardous goods cannot be carried, including aerosol, asbestos, ashes, detergents, resin, explosives, filth, fire extinguishers, fireworks, gas, dry ice, items containing alcohol, and flammable or explosive substances." },
 
   { key:"illegal", label:"Illegal / counterfeit", icon:"gavel",
-    details:"Illegal goods are prohibited (incl. counterfeit goods/currency, or items illegal in exporting/importing country)." },
+    details:"Illegal goods cannot be carried, including counterfeit goods, counterfeit currency, and any items considered illegal in either the exporting or importing country." },
 
   { key:"liquids_gels", label:"Liquids / creams / gels", icon:"water_drop",
-    details:"Liquids, creams, oils, wax or gels are prohibited on this service." },
+    details:"Liquids, creams, oils, wax, or gels cannot be carried on any service." },
 
   { key:"medical_equipment", label:"Medical equipment", icon:"medical_information",
-    details:"Medical equipment is prohibited on this service." },
+    details:"Medical equipment cannot be carried on any service." },
 
   { key:"money_docs", label:"Money / financial docs", icon:"payments",
-    details:"Monetary/currency incl. cash, cards, coins, cheques, vouchers, tickets, lottery tickets, stamps (unless franked) and financial documents are prohibited." },
+    details:"Monetary and currency items cannot be carried, including cash, credit cards, debit cards, coins, cheques, vouchers, tickets, lottery tickets, stamps (unless franked), and financial documents." },
 
   { key:"poisons", label:"Poisons / pesticides", icon:"pest_control",
-    details:"Poisonous/toxic liquids/solids/gases incl. pesticides are prohibited." },
+    details:"Poisonous or toxic liquids, solids, and gases cannot be carried, including pesticides." },
 
   { key:"radioactive", label:"Radioactive materials", icon:"dangerous",
-    details:"Radioactive materials are prohibited on this service." },
+    details:"Radioactive materials cannot be carried on any service." },
 
   { key:"vehicle_parts_large", label:"Vehicle parts (large)", icon:"directions_car",
-    details:"Large vehicle parts are prohibited (incl. panels, spoilers, doors, bonnets, bumpers, carbon fibre, engines, any parts containing oil/liquids, airbags, seatbelt tensioners)." },
+    details:"Large vehicle parts cannot be carried, including vehicle panels, spoilers, doors, bonnets, bumpers, carbon fibre, engines, any car parts containing oil or liquids, airbags, steering wheels containing airbags, and seatbelt tensioners." },
 
   { key:"weapons", label:"Weapons / blades", icon:"dangerous",
-    details:"Weapons are prohibited (incl. replicas, ammunition, axes, blades, chainsaws, guns, knives etc.)." },
+    details:"Weapons cannot be carried, including replicas, ammunition, axes, blades, chainsaws, guns, and knives." },
 
   { key:"white_goods", label:"White goods", icon:"kitchen",
-    details:"White goods are prohibited (fridges, ovens, freezers, cooker hoods, hobs, boilers, washing machines, hot tubs etc.)." },
+    details:"White goods cannot be carried, including fridges, ovens, freezers, cooker hoods, hobs, boilers, washing machines, and hot tubs." },
 
   { key:"geochron", label:"Geochron", icon:"public",
-    details:"Geochron items are prohibited on this service." },
+    details:"Geochron items cannot be carried on any service." },
 ];
 
 // RESTRICTED (allowed with conditions) — placeholders (swap with your real restricted catalogue)
@@ -330,67 +330,67 @@ const RESTRICTED = [
 // COVER LIMITS: Loss-only (refund if lost, not damage)
 const LOSS_ONLY = [
   { key:"antiques", label:"Antiques (100+ yrs)", icon:"museum",
-    details:"Loss-only: not protected for damage. If lost, refund carriage + item value (parcel protection required)." },
+    details:"Not protected for damage. If lost in the carrier network, carriage and item value can be refunded when parcel protection is in place." },
 
   { key:"wood_flooring", label:"Wooden flooring", icon:"grid_on",
-    details:"Loss-only: not protected for damage. If lost, refund carriage + item value (parcel protection required)." },
+    details:"Any type of wooden flooring, including laminate, is not protected for damage. If lost, carriage and item value can be refunded when parcel protection is in place." },
 
   { key:"coffee_machines", label:"Coffee machines", icon:"coffee_maker",
-    details:"Loss-only: not protected for damage. If lost, refund carriage + item value (parcel protection required)." },
+    details:"Coffee machines, coffee grinders, and coffee roasters are not protected for damage. If lost, carriage and item value can be refunded when parcel protection is in place." },
 
   { key:"cycles", label:"Cycles", icon:"pedal_bike",
-    details:"Loss-only: not protected for damage. Max parcel protection for loss is £1,000." },
+    details:"Cycles, bicycles, unicycles, and tricycles are not protected for damage. Maximum parcel protection value for loss is GBP 1,000." },
 
   { key:"electrical_appliances", label:"Electrical appliances", icon:"devices",
-    details:"Loss-only: not protected for damage (e.g., cameras, monitors, computers, drones, lamps, laptops, scanners, TV, projector etc.)." },
+    details:"Electrical appliances that are not white goods are not protected for damage, including cameras, monitors, computers, all-in-one computers, drones, lamps, laptops, scanners, TVs, and projectors." },
 
   { key:"fishing_rods", label:"Fishing rods", icon:"sports_and_outdoors",
-    details:"Loss-only: not protected for damage. If lost, refund carriage + item value (parcel protection required)." },
+    details:"Fishing rods are not protected for damage. If lost, carriage and item value can be refunded when parcel protection is in place." },
 
   { key:"furniture", label:"Furniture", icon:"weekend",
-    details:"Loss-only: not protected for damage. If lost, refund carriage + item value (parcel protection required)." },
+    details:"Furniture is not protected for damage. If lost, carriage and item value can be refunded when parcel protection is in place." },
 
   { key:"sewing_knitting", label:"Sewing/knitting machines", icon:"precision_manufacturing",
-    details:"Loss-only: not protected for damage. If lost, refund carriage + item value (parcel protection required)." },
+    details:"Knitting machines and sewing machines are not protected for damage. If lost, carriage and item value can be refunded when parcel protection is in place." },
 
   { key:"models_kits", label:"Models / kits", icon:"view_in_ar",
-    details:"Loss-only: not protected for damage. If lost, refund carriage + item value (parcel protection required)." },
+    details:"Models and kits are not protected for damage. If lost, carriage and item value can be refunded when parcel protection is in place." },
 
   { key:"musical_instruments", label:"Musical instruments", icon:"music_note",
-    details:"Loss-only: not protected for damage. Must be sent in a hard case and boxed. Max parcel protection for loss is £1,000." },
+    details:"Musical instruments, including guitars, amplifiers, speakers, turntables, violins, and keyboards, are not protected for damage. Items must be sent in a hard case and boxed. Maximum parcel protection value for loss is GBP 1,000." },
 
   { key:"suitcase_packaging", label:"Suitcase as packaging", icon:"luggage",
-    details:"Loss-only: suitcase not protected if used as packaging for internal items." },
+    details:"A suitcase is not protected if it is used as packaging for internal items." },
 
   { key:"surfboard", label:"Surfboard", icon:"surfing",
-    details:"Loss-only: not protected for damage. If lost, refund carriage + item value (parcel protection required)." },
+    details:"Surfboards are not protected for damage. If lost, carriage and item value can be refunded when parcel protection is in place." },
 
   { key:"telescopes", label:"Telescopes/microscopes", icon:"biotech",
-    details:"Loss-only: not protected for damage. If lost, refund carriage + item value (parcel protection required)." },
+    details:"Telescopes and microscopes are not protected for damage. If lost, carriage and item value can be refunded when parcel protection is in place." },
 
   { key:"wall_decor", label:"Wall décor / frames", icon:"photo_frame",
-    details:"Loss-only: not protected for damage (canvas prints, clocks, framed pictures, posters, prints, paintings etc.)." },
+    details:"Wall decor items are not protected for damage, including canvas prints, clocks, framed pictures, pictures, posters, prints, and paintings." },
 ];
 
 // COVER LIMITS: No compensation (sender’s risk)
 const NO_COMP = [
   { key:"ceramics_stone", label:"Ceramics / stone", icon:"category",
-    details:"No compensation: ceramics/porcelain/china/stone incl. tiles, sinks, basins, toilets, baths, crockery, granite, marble, vases, pottery, plates etc." },
+    details:"No compensation: ceramics, porcelain, china, and stone items, including tiles, sinks, basins, toilets, baths, concrete, crockery, granite, marble, vases, pottery, and plates." },
 
   { key:"glass", label:"Glass items", icon:"wine_bar",
-    details:"No compensation: glass of any type incl. glassware, crystal, bulbs, screens, fiberglass, fish tanks, mirrors, spectacles, windows, perspex." },
+    details:"No compensation: glass items of any type, including glassware, crystal, bulbs, screens, fiberglass, fish tanks, mirrors, spectacles, windows, and perspex." },
 
   { key:"packaging", label:"Packaging", icon:"inventory_2",
-    details:"No compensation: packaging incl. box, media packaging, suitcases used as packaging." },
+    details:"No compensation: packaging items, including the box, media packaging, and suitcases used as packaging." },
 
   { key:"precious_metals", label:"Precious metals / gems", icon:"diamond",
-    details:"No compensation: gold, silver, gems, diamonds incl. jewellery form." },
+    details:"No compensation: precious metals and stones, including gold, silver, gems, and diamonds, including in jewellery form." },
 
   { key:"small_vehicle_parts", label:"Small vehicle parts", icon:"build",
-    details:"No compensation: small vehicle parts incl. headlights, taillights, gearboxes." },
+    details:"No compensation: small vehicle parts, including headlights, taillights, and gearboxes." },
 
   { key:"watches", label:"Watches", icon:"watch",
-    details:"No compensation: watches are carried at sender’s risk." },
+    details:"No compensation: watches are carried at sender risk." },
 ];
 
 /* ---------------------------
@@ -535,7 +535,7 @@ function renderProhibited(){
     <div class="stepHeader">
       <div>
         <h1>What’s inside your item?</h1>
-        <p class="subtitle"><strong>DOES your item contain any of the following?</strong> Select one option to continue.</p>
+        <p class="subtitle"><strong>The following items (or any item similar in description or content) cannot be carried on any service.</strong> Select one option to continue.</p>
       </div>
       <span class="pill"><span class="material-symbols-outlined">block</span> Prohibited (hard stop)</span>
     </div>
@@ -618,23 +618,23 @@ function renderCoverLimits(){
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Cover limits</h1>
-        <p class="subtitle">Some items are carried with limited or no protection. Select any that apply.</p>
+        <h1>Compensation policy</h1>
+        <p class="subtitle">Select any categories that match your item.</p>
       </div>
       <span class="pill"><span class="material-symbols-outlined">shield</span> Protection rules</span>
     </div>
 
     <div class="card" style="margin-bottom:14px;">
-      <h3>Loss-only items (not protected for damage)</h3>
-      <p>Select if your item matches any category below.</p>
+      <h3>Items protected for loss only</h3>
+      <p>The couriers can carry these items but do not protect for damage. If an item is lost in their network, carriage and item value can be refunded when parcel protection is in place.</p>
       <div class="gridWrap">
         <div class="grid" id="lossGrid"></div>
       </div>
     </div>
 
     <div class="card">
-      <h3>No compensation items (sender’s risk)</h3>
-      <p>Select if your item matches any category below.</p>
+      <h3>No compensation items</h3>
+      <p>The following items (or items similar in description or content) are carried on a no-protection basis on any service. Senders of these items do so at their own risk.</p>
       <div class="gridWrap">
         <div class="grid" id="ncGrid"></div>
       </div>
