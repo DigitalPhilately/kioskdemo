@@ -749,12 +749,15 @@ function wireRMDangerousDetails(list){
 function renderRMConditions(){
   const isUK = state.destination === "uk";
   const item = RM_FILTER.find(x => x.key === state.rmSelectedKey);
-  const allowed = item ? (isUK ? item.uk : item.intl) : true;
-  const selectedLabel = item ? item.label : "Other / not listed";
+  const isOther = state.rmSelectedKey === "rm_other_not_listed";
+  const allowed = isOther ? true : (item ? (isUK ? item.uk : item.intl) : true);
+  const selectedLabel = isOther ? "Other / not listed" : (item ? item.label : "Other / not listed");
   const outcomeClass = allowed ? "ok" : "danger";
-  const outcomeText = allowed
+  const outcomeText = isOther
+    ? "No dangerous goods conditions were triggered from the Royal Mail list."
+    : (allowed
     ? "This category can be sent on the selected destination only when Royal Mail conditions are met."
-    : "This category is not allowed for the selected destination under Royal Mail rules.";
+    : "This category is not allowed for the selected destination under Royal Mail rules.");
 
   screen.innerHTML = `
     <div class="stepHeader">
@@ -775,7 +778,9 @@ function renderRMConditions(){
       </div>
       <div class="card">
         <h3>Before acceptance, confirm</h3>
-        <div class="helpNote">1. Sender name and return address is visible.<br/>2. Item meets quantity limits for this category.<br/>3. Packaging meets Royal Mail requirements (leak/sift/impact protection as relevant).<br/>4. Counter presentation is used where required.<br/>5. Destination-specific rules are satisfied.</div>
+        <div class="helpNote">${isOther
+          ? "No additional dangerous goods conditions are required for this selection. Continue with normal product and service checks."
+          : "1. Sender name and return address is visible.<br/>2. Item meets quantity limits for this category.<br/>3. Packaging meets Royal Mail requirements (leak/sift/impact protection as relevant).<br/>4. Counter presentation is used where required.<br/>5. Destination-specific rules are satisfied."}</div>
         <p style="margin-top:10px; color:var(--muted); font-size:12px;">Source: Royal Mail and Parcelforce prohibited/restricted items leaflet (valid from May 2025).</p>
       </div>
     </div>
