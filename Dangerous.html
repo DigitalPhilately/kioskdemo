@@ -244,8 +244,13 @@ const state = {
   weightG: "",
   format: "",
   destination: "",
+  productProfile: "evri_dpd",
   prohibitedKey: null,    // if set -> hard stop message
   prohibitedOtherSelected: false,
+  rmSelectedKey: null,
+  rmBlockedKey: null,
+  rmOtherSelected: false,
+  rmAdvisoryKeys: new Set(),
   restrictedKeys: new Set(),
   coverLossOnlyKeys: new Set(),
   coverNoCompKeys: new Set(),
@@ -331,6 +336,55 @@ const RESTRICTED = [
 
   { key:"perfume_small", label:"Perfume / aftershave", icon:"sanitizer",
     details:"Perfume may be allowable only under specific limits and packaging rules. Check destination restrictions." },
+];
+
+// ROYAL MAIL DANGEROUS GOODS FILTER (from RM leaflet valid from May 2025)
+const RM_FILTER = [
+  { key:"rm_aerosol_toiletry", label:"Toiletry/medicinal aerosols", icon:"air", uk:true, intl:false,
+    details:"Allowed UK only with restrictions: max 500ml per item, max two items per parcel, counter presentation, sender name and address visible." },
+  { key:"rm_alcohol_24_70", label:"Alcohol 24% to 70% ABV", icon:"liquor", uk:true, intl:false,
+    details:"Allowed UK only with restrictions: max 1 litre per item, max two items per parcel, wrapped and cushioned, counter presentation." },
+  { key:"rm_alcohol_upto24", label:"Alcohol up to 24% ABV", icon:"wine_bar", uk:true, intl:true,
+    details:"Allowed UK and International with restrictions: max 1 litre per item, wrapped and cushioned, mark FRAGILE when glass." },
+  { key:"rm_perfume", label:"Perfume / aftershave", icon:"spa", uk:true, intl:false,
+    details:"Allowed UK only with restrictions: max 150ml per item, max four items per parcel, original retail packaging, counter presentation." },
+  { key:"rm_nail_varnish", label:"Nail varnish / polish / gel", icon:"brush", uk:true, intl:false,
+    details:"Allowed UK only with restrictions: max 30ml per item, max four items per parcel, strong outer packaging, counter presentation." },
+  { key:"rm_lithium_connected", label:"Device with connected lithium battery", icon:"battery_alert", uk:true, intl:true,
+    details:"Allowed UK and International with restrictions. Battery limits apply and item must be packed to prevent accidental activation." },
+  { key:"rm_lithium_not_connected", label:"Lithium batteries not connected", icon:"battery_unknown", uk:true, intl:false,
+    details:"Allowed UK only with restrictions. Applies where batteries are sent with a device but not connected." },
+  { key:"rm_sharp_pointed", label:"Sharp or pointed items", icon:"content_cut", uk:true, intl:true,
+    details:"Allowed UK and International if safely packaged so points and edges cannot pierce packaging." },
+  { key:"rm_prescription_non_toxic", label:"Prescription medicine (non-toxic/non-flammable)", icon:"medication", uk:true, intl:true,
+    details:"Allowed UK and International with quantity and packaging limits." },
+  { key:"rm_perishables", label:"Perishables", icon:"eco", uk:true, intl:false,
+    details:"Royal Mail allows UK only. Additional prohibitions apply for certain NI movements." },
+  { key:"rm_batteries_dangerous_used", label:"Dangerous/used batteries", icon:"battery_0_bar", uk:false, intl:false,
+    details:"Not allowed UK or International (includes car batteries, solo lithium batteries, power banks, and damaged batteries)." },
+  { key:"rm_flammables_explosives", label:"Flammables / explosives", icon:"local_fire_department", uk:false, intl:false,
+    details:"Not allowed UK or International (includes flammable liquids/solids, spray paints, fireworks, matches, solvent paints)." },
+  { key:"rm_weapons", label:"Weapons", icon:"gpp_bad", uk:false, intl:false,
+    details:"Not allowed UK or International." },
+  { key:"rm_gases", label:"Gases and cylinders", icon:"propane_tank", uk:false, intl:false,
+    details:"Not allowed UK or International (includes gas canisters, refills, fire extinguishers, scuba tanks)." },
+  { key:"rm_poisons_radioactive", label:"Poisons / radioactive", icon:"warning", uk:false, intl:false,
+    details:"Not allowed UK or International." },
+];
+
+const RM_ADVISORY = [
+  { key:"rmc_counter", label:"Counter presentation required", icon:"storefront",
+    details:"Certain restricted items (for example aerosols, perfumes, and nail products) must be presented at the Post Office counter." },
+  { key:"rmc_sender_details", label:"Sender details required", icon:"badge",
+    details:"Sender name and return address must be clearly visible on parcels for certain restricted dangerous goods." },
+  { key:"rmc_quantity_limits", label:"Quantity limits apply", icon:"rule",
+    details:"Royal Mail applies per-item and per-parcel limits for many restricted items. Check limits before acceptance." },
+  { key:"rmc_packaging", label:"Specific packaging required", icon:"inventory_2",
+    details:"Restricted items must be tightly packed in strong outer packaging with leak/sift protection where applicable." },
+  { key:"rmc_battery_limits", label:"Lithium battery limits", icon:"battery_charging_full",
+    details:"Lithium cells and batteries must meet Wh/g limits, be protected from short-circuit, and be secured against movement." },
+  { key:"rmc_country_rules", label:"Destination rules vary", icon:"public",
+    details:"Some categories are UK-only. International acceptance depends on destination and current Royal Mail rules." },
 ];
 
 // COVER LIMITS: Loss-only (refund if lost, not damage)
@@ -449,8 +503,14 @@ function render(){
   updateProgress();
 
   if(state.step === 1) renderWeigh();
-  else if(state.step === 2) renderProhibited();
-  else if(state.step === 3) renderPolicyChecks();
+  else if(state.step === 2) {
+    if(state.productProfile === "royal_mail") renderRMDangerous();
+    else renderProhibited();
+  }
+  else if(state.step === 3) {
+    if(state.productProfile === "royal_mail") renderRMConditions();
+    else renderPolicyChecks();
+  }
   else renderSummary();
 
   nextBtn.innerHTML = `Continue <span class="material-symbols-outlined">arrow_forward</span>`;
@@ -501,6 +561,15 @@ function renderWeigh(){
           </button>
         </div>
         <div class="helpNote">Destination determines restricted and prohibited rules.</div>
+        <p style="margin:12px 0 8px;color:var(--muted);font-size:13px;">Which product family are you checking?</p>
+        <div class="choiceRow" id="profileChoices">
+          <button type="button" class="choiceBtn ${state.productProfile==="evri_dpd"?"active":""}" data-value="evri_dpd">
+            <span>EVRi / DPD</span>
+          </button>
+          <button type="button" class="choiceBtn ${state.productProfile==="royal_mail"?"active":""}" data-value="royal_mail">
+            <span>Royal Mail</span>
+          </button>
+        </div>
       </div>
     </div>
   `;
@@ -519,6 +588,12 @@ function renderWeigh(){
     btn.addEventListener("click", ()=>{
       state.format = btn.dataset.value || "";
       document.querySelectorAll("#formatChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
+    });
+  });
+  document.querySelectorAll("#profileChoices .choiceBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.productProfile = btn.dataset.value || "evri_dpd";
+      document.querySelectorAll("#profileChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
     });
   });
 }
@@ -576,6 +651,136 @@ function renderProhibited(){
   list.forEach(item => grid.appendChild(tileEl(item, "p")));
 
   wireProhibitedDetails(list);
+}
+
+function renderRMDangerous(){
+  const list = padTo25([
+    ...RM_FILTER,
+    { key:"rm_other_not_listed", label:"Other / not listed", icon:"check_circle",
+      details:"Select this if your item does not match any listed category." }
+  ]);
+  const isUK = state.destination === "uk";
+
+  screen.innerHTML = `
+    <div class="stepHeader">
+      <div>
+        <h1>Royal Mail dangerous goods</h1>
+        <p class="subtitle"><strong>Does your item contain any of the following categories?</strong> Rules shown are based on destination (${isUK ? "UK" : "International"}).</p>
+      </div>
+      <span class="pill"><span class="material-symbols-outlined">local_shipping</span> RM filter</span>
+    </div>
+
+    <div class="gridWrap">
+      <div class="grid" id="rmGrid"></div>
+
+      <div class="details" id="rmDetails">
+        <div class="detailsTop">
+          <div class="detailsTitle" id="rmDetailsTitle"></div>
+          <button class="btn" id="rmClose"><span class="material-symbols-outlined">close</span>Close</button>
+        </div>
+        <div class="detailsText" id="rmDetailsText"></div>
+        <div class="banner" id="rmStatusBanner"></div>
+      </div>
+    </div>
+  `;
+
+  const grid = document.getElementById("rmGrid");
+  list.forEach(item => grid.appendChild(tileEl(item, "rm")));
+  wireRMDangerousDetails(list);
+}
+
+function wireRMDangerousDetails(list){
+  const details = document.getElementById("rmDetails");
+  const title = document.getElementById("rmDetailsTitle");
+  const text = document.getElementById("rmDetailsText");
+  const banner = document.getElementById("rmStatusBanner");
+  const close = document.getElementById("rmClose");
+  const isUK = state.destination === "uk";
+
+  document.querySelectorAll('.tile[data-mode="rm"]').forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const key = btn.dataset.key;
+      const item = list.find(x=>x.key===key);
+      if(!item) return;
+
+      document.querySelectorAll('.tile[data-mode="rm"]').forEach(b=>b.classList.remove("selected"));
+      btn.classList.add("selected");
+
+      if(key === "rm_other_not_listed"){
+        state.rmSelectedKey = key;
+        state.rmBlockedKey = null;
+        state.rmOtherSelected = true;
+        details.classList.remove("show");
+        return;
+      }
+
+      state.rmSelectedKey = key;
+      state.rmOtherSelected = false;
+      const allowed = isUK ? item.uk : item.intl;
+      state.rmBlockedKey = allowed ? null : key;
+
+      title.innerHTML = `
+        <div class="icon"><span class="material-symbols-outlined">${item.icon || "block"}</span></div>
+        ${escapeHtml(item.label)}
+      `;
+      text.textContent = item.details || "";
+
+      banner.className = "banner show";
+      if(allowed){
+        banner.classList.add((item.uk && item.intl) ? "ok" : "warn");
+        banner.textContent = (item.uk && item.intl)
+          ? "Allowed for this destination when Royal Mail packaging conditions are met."
+          : "Restricted: allowed only on specific destinations/services with conditions.";
+      } else {
+        banner.classList.add("danger");
+        banner.textContent = "Not allowed for this destination under Royal Mail dangerous goods rules.";
+      }
+
+      details.classList.add("show");
+    });
+  });
+
+  close.addEventListener("click", ()=>{
+    details.classList.remove("show");
+    document.querySelectorAll('.tile[data-mode="rm"]').forEach(b=>b.classList.remove("selected"));
+  });
+}
+
+function renderRMConditions(){
+  const list = padTo25(RM_ADVISORY);
+
+  screen.innerHTML = `
+    <div class="stepHeader">
+      <div>
+        <h1>Royal Mail conditions</h1>
+        <p class="subtitle">Review key packaging and acceptance conditions for RM dangerous goods handling.</p>
+      </div>
+      <span class="pill"><span class="material-symbols-outlined">gavel</span> RM conditions</span>
+    </div>
+
+    <div class="gridWrap">
+      <div class="grid" id="rmcGrid"></div>
+      <div class="details" id="rmcDetails">
+        <div class="detailsTop">
+          <div class="detailsTitle" id="rmcDetailsTitle"></div>
+          <button class="btn" id="rmcClose"><span class="material-symbols-outlined">close</span>Close</button>
+        </div>
+        <div class="detailsText" id="rmcDetailsText"></div>
+        <div class="banner warn show" style="display:block; margin-top:10px;">
+          Source: Royal Mail and Parcelforce prohibited/restricted items leaflet (valid from May 2025).
+        </div>
+      </div>
+    </div>
+  `;
+
+  const grid = document.getElementById("rmcGrid");
+  list.forEach(item => grid.appendChild(tileEl(item, "rmc", true)));
+  wireMultiSelectDetails("rmc", list, state.rmAdvisoryKeys, "rmc");
+
+  document.getElementById("rmcClose").addEventListener("click", ()=> {
+    document.getElementById("rmcDetails").classList.remove("show");
+    document.querySelectorAll('.tile[data-mode="rmc"]').forEach(b=>b.classList.remove("selected"));
+  });
 }
 
 function renderPolicyChecks(){
@@ -664,10 +869,13 @@ function renderPolicyChecks(){
 function renderSummary(){
   const dest = state.destination === "uk" ? "UK" : (state.destination === "intl" ? "International" : "Not set");
   const fmt = ({letter:"Letter", large_letter:"Large letter", parcel:"Parcel"})[state.format] || "Not set";
+  const profile = state.productProfile === "royal_mail" ? "Royal Mail rules" : "EVRi/DPD rules";
 
   const restrictedLabels = [...state.restrictedKeys].map(k => RESTRICTED.find(x=>x.key===k)?.label).filter(Boolean);
   const lossLabels = [...state.coverLossOnlyKeys].map(k => LOSS_ONLY.find(x=>x.key===k)?.label).filter(Boolean);
   const ncLabels = [...state.coverNoCompKeys].map(k => NO_COMP.find(x=>x.key===k)?.label).filter(Boolean);
+  const rmSelected = RM_FILTER.find(x=>x.key===state.rmSelectedKey)?.label || (state.rmOtherSelected ? "Other / not listed" : "None");
+  const rmConditions = [...state.rmAdvisoryKeys].map(k => RM_ADVISORY.find(x=>x.key===k)?.label).filter(Boolean);
 
   screen.innerHTML = `
     <div class="stepHeader">
@@ -685,6 +893,7 @@ function renderSummary(){
           <span class="tag"><span class="material-symbols-outlined">scale</span> ${escapeHtml(state.weightG || "—")} g</span>
           <span class="tag"><span class="material-symbols-outlined">straighten</span> ${fmt}</span>
           <span class="tag"><span class="material-symbols-outlined">public</span> ${dest}</span>
+          <span class="tag"><span class="material-symbols-outlined">inventory</span> ${profile}</span>
         </div>
         <div class="helpNote">Next in the real journey: product/service filtering & pricing.</div>
       </div>
@@ -692,21 +901,38 @@ function renderSummary(){
       <div class="card">
         <h3>Screening flags</h3>
 
-        ${state.prohibitedKey ? `
-          <div class="banner danger show" style="display:block;">
-            Prohibited selection was made: ${escapeHtml(PROHIBITED.find(x=>x.key===state.prohibitedKey)?.label || state.prohibitedKey)} (journey would stop).
-          </div>
+        ${state.productProfile === "royal_mail" ? `
+          ${state.rmBlockedKey ? `
+            <div class="banner danger show" style="display:block;">
+              Royal Mail blocked selection: ${escapeHtml(RM_FILTER.find(x=>x.key===state.rmBlockedKey)?.label || state.rmBlockedKey)}.
+            </div>
+          ` : `
+            <div class="banner ok show" style="display:block;">
+              Royal Mail dangerous goods filter completed.
+            </div>
+          `}
         ` : `
-          <div class="banner ok show" style="display:block;">
-            No prohibited items selected.
-          </div>
+          ${state.prohibitedKey ? `
+            <div class="banner danger show" style="display:block;">
+              Prohibited selection was made: ${escapeHtml(PROHIBITED.find(x=>x.key===state.prohibitedKey)?.label || state.prohibitedKey)} (journey would stop).
+            </div>
+          ` : `
+            <div class="banner ok show" style="display:block;">
+              No prohibited items selected.
+            </div>
+          `}
         `}
 
         <div style="margin-top:10px;">
           <div class="helpNote">
-            <strong>Restricted:</strong> ${restrictedLabels.length ? escapeHtml(restrictedLabels.join(", ")) : "None"}<br/>
-            <strong>Loss-only:</strong> ${lossLabels.length ? escapeHtml(lossLabels.join(", ")) : "None"}<br/>
-            <strong>No-comp:</strong> ${ncLabels.length ? escapeHtml(ncLabels.join(", ")) : "None"}
+            ${state.productProfile === "royal_mail" ? `
+              <strong>RM filter selection:</strong> ${escapeHtml(rmSelected)}<br/>
+              <strong>RM condition tags:</strong> ${rmConditions.length ? escapeHtml(rmConditions.join(", ")) : "None"}
+            ` : `
+              <strong>Restricted:</strong> ${restrictedLabels.length ? escapeHtml(restrictedLabels.join(", ")) : "None"}<br/>
+              <strong>Loss-only:</strong> ${lossLabels.length ? escapeHtml(lossLabels.join(", ")) : "None"}<br/>
+              <strong>No-comp:</strong> ${ncLabels.length ? escapeHtml(ncLabels.join(", ")) : "None"}
+            `}
           </div>
         </div>
       </div>
@@ -821,22 +1047,34 @@ function wireMultiSelectDetails(mode, list, setRef, detailsMode="r"){
    Navigation rules
 ---------------------------- */
 function canContinue(){
-  if(state.step === 1) return !!state.weightG && !!state.destination && !!state.format;
+  if(state.step === 1) return !!state.weightG && !!state.destination && !!state.format && !!state.productProfile;
 
-  // Step 2 requires explicit acknowledgement via "Other / not listed".
-  // If a prohibited tile is selected, this stays blocked.
-  if(state.step === 2) return state.prohibitedOtherSelected && !state.prohibitedKey;
+  if(state.step === 2){
+    if(state.productProfile === "royal_mail"){
+      return (state.rmOtherSelected || !!state.rmSelectedKey) && !state.rmBlockedKey;
+    }
+    // EVRi/DPD step 2 requires explicit acknowledgement via "Other / not listed".
+    return state.prohibitedOtherSelected && !state.prohibitedKey;
+  }
 
   return true;
 }
 
 function next(){
   if(!canContinue()){
-    if(state.step === 2 && state.prohibitedKey){
-      alert("A prohibited item has been selected. In the live journey this would stop here.");
-      return;
-    }
     if(state.step === 2){
+      if(state.productProfile === "royal_mail"){
+        if(state.rmBlockedKey){
+          alert("This item is not allowed for the selected destination under Royal Mail rules.");
+          return;
+        }
+        alert("Please select a Royal Mail category or choose 'Other / not listed'.");
+        return;
+      }
+      if(state.prohibitedKey){
+        alert("A prohibited item has been selected. In the live journey this would stop here.");
+        return;
+      }
       alert("Please select 'Other / not listed' to confirm your item is not shown.");
       return;
     }
@@ -857,8 +1095,13 @@ function resetAll(){
   state.weightG = "";
   state.format = "";
   state.destination = "";
+  state.productProfile = "evri_dpd";
   state.prohibitedKey = null;
   state.prohibitedOtherSelected = false;
+  state.rmSelectedKey = null;
+  state.rmBlockedKey = null;
+  state.rmOtherSelected = false;
+  state.rmAdvisoryKeys = new Set();
   state.restrictedKeys = new Set();
   state.coverLossOnlyKeys = new Set();
   state.coverNoCompKeys = new Set();
