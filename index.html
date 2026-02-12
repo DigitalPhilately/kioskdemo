@@ -747,40 +747,39 @@ function wireRMDangerousDetails(list){
 }
 
 function renderRMConditions(){
-  const list = padTo25(RM_ADVISORY);
+  const isUK = state.destination === "uk";
+  const item = RM_FILTER.find(x => x.key === state.rmSelectedKey);
+  const allowed = item ? (isUK ? item.uk : item.intl) : true;
+  const selectedLabel = item ? item.label : "Other / not listed";
+  const outcomeClass = allowed ? "ok" : "danger";
+  const outcomeText = allowed
+    ? "This category can be sent on the selected destination only when Royal Mail conditions are met."
+    : "This category is not allowed for the selected destination under Royal Mail rules.";
 
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Royal Mail conditions</h1>
-        <p class="subtitle">Review key packaging and acceptance conditions for RM dangerous goods handling.</p>
+        <h1>Royal Mail decision</h1>
+        <p class="subtitle">Clear outcome and required checks for this item.</p>
       </div>
-      <span class="pill"><span class="material-symbols-outlined">gavel</span> RM conditions</span>
+      <span class="pill"><span class="material-symbols-outlined">gavel</span> RM checks</span>
     </div>
 
-    <div class="gridWrap">
-      <div class="grid" id="rmcGrid"></div>
-      <div class="details" id="rmcDetails">
-        <div class="detailsTop">
-          <div class="detailsTitle" id="rmcDetailsTitle"></div>
-          <button class="btn" id="rmcClose"><span class="material-symbols-outlined">close</span>Close</button>
+    <div class="formRow">
+      <div class="card">
+        <h3>Selected category</h3>
+        <div class="helpNote"><strong>${escapeHtml(selectedLabel)}</strong></div>
+        <div class="banner ${outcomeClass} show" style="display:block; margin-top:10px;">
+          ${escapeHtml(outcomeText)}
         </div>
-        <div class="detailsText" id="rmcDetailsText"></div>
-        <div class="banner warn show" style="display:block; margin-top:10px;">
-          Source: Royal Mail and Parcelforce prohibited/restricted items leaflet (valid from May 2025).
-        </div>
+      </div>
+      <div class="card">
+        <h3>Before acceptance, confirm</h3>
+        <div class="helpNote">1. Sender name and return address is visible.<br/>2. Item meets quantity limits for this category.<br/>3. Packaging meets Royal Mail requirements (leak/sift/impact protection as relevant).<br/>4. Counter presentation is used where required.<br/>5. Destination-specific rules are satisfied.</div>
+        <p style="margin-top:10px; color:var(--muted); font-size:12px;">Source: Royal Mail and Parcelforce prohibited/restricted items leaflet (valid from May 2025).</p>
       </div>
     </div>
   `;
-
-  const grid = document.getElementById("rmcGrid");
-  list.forEach(item => grid.appendChild(tileEl(item, "rmc", true)));
-  wireMultiSelectDetails("rmc", list, state.rmAdvisoryKeys, "rmc");
-
-  document.getElementById("rmcClose").addEventListener("click", ()=> {
-    document.getElementById("rmcDetails").classList.remove("show");
-    document.querySelectorAll('.tile[data-mode="rmc"]').forEach(b=>b.classList.remove("selected"));
-  });
 }
 
 function renderPolicyChecks(){
@@ -875,7 +874,6 @@ function renderSummary(){
   const lossLabels = [...state.coverLossOnlyKeys].map(k => LOSS_ONLY.find(x=>x.key===k)?.label).filter(Boolean);
   const ncLabels = [...state.coverNoCompKeys].map(k => NO_COMP.find(x=>x.key===k)?.label).filter(Boolean);
   const rmSelected = RM_FILTER.find(x=>x.key===state.rmSelectedKey)?.label || (state.rmOtherSelected ? "Other / not listed" : "None");
-  const rmConditions = [...state.rmAdvisoryKeys].map(k => RM_ADVISORY.find(x=>x.key===k)?.label).filter(Boolean);
 
   screen.innerHTML = `
     <div class="stepHeader">
@@ -927,7 +925,7 @@ function renderSummary(){
           <div class="helpNote">
             ${state.productProfile === "royal_mail" ? `
               <strong>RM filter selection:</strong> ${escapeHtml(rmSelected)}<br/>
-              <strong>RM condition tags:</strong> ${rmConditions.length ? escapeHtml(rmConditions.join(", ")) : "None"}
+              <strong>RM conditions:</strong> Standard Royal Mail checks reviewed
             ` : `
               <strong>Restricted:</strong> ${restrictedLabels.length ? escapeHtml(restrictedLabels.join(", ")) : "None"}<br/>
               <strong>Loss-only:</strong> ${lossLabels.length ? escapeHtml(lossLabels.join(", ")) : "None"}<br/>
