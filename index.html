@@ -244,13 +244,18 @@ const state = {
   weightG: "",
   format: "",
   destination: "",
-  productProfile: "evri_dpd",
+  productProfile: "royal_mail",
   quickDemoMode: false,
   prohibitedKey: null,    // if set -> hard stop message
   prohibitedOtherSelected: false,
   rmSelectedKey: null,
   rmBlockedKey: null,
   rmOtherSelected: false,
+  evriAdditionalSelection: "",
+  evriAdditionalBlocked: false,
+  evriScreeningComplete: false,
+  evriLossOnlySelected: false,
+  evriNoCompSelected: false,
   rmAdvisoryKeys: new Set(),
   restrictedKeys: new Set(),
   coverLossOnlyKeys: new Set(),
@@ -265,6 +270,8 @@ const state = {
   senderAddress: "",
   niCustomsConfirmed: false,
   niCustomsReference: "",
+  niSpsCategory: "",
+  niPrivateIndividual: "",
   proofOfDelivery: false,
   selectedServiceId: "",
   basketAdded: false,
@@ -533,9 +540,7 @@ function calculateServicePrice(service){
 function availableServices(){
   const weight = Number.parseInt(state.weightG || "0", 10) || 0;
   const isIntl = state.destination === "intl";
-  const needsTracked = state.productProfile === "evri_dpd" && state.restrictedKeys.size > 0;
-
-  let list = SERVICES.filter(s => s.profile === state.productProfile);
+  let list = [...SERVICES];
   list = list.filter(s => s.maxWeight >= weight);
   list = list.filter(s => isIntl ? s.intl : true);
   if(!isIntl) list = list.filter(s => s.intl ? false : true);
@@ -543,9 +548,6 @@ function availableServices(){
   if(state.deliverySpeed === "fast"){
     list = list.filter(s => s.speed === "fast");
   } else if(state.deliverySpeed === "tracked"){
-    list = list.filter(s => s.tracked);
-  }
-  if(needsTracked){
     list = list.filter(s => s.tracked);
   }
 
@@ -567,16 +569,10 @@ function applyQuickDemoDefaults(){
   if(!state.weightG) state.weightG = "850";
   if(!state.destination) state.destination = "uk";
   if(!state.format) state.format = "parcel";
-  if(!state.productProfile) state.productProfile = "royal_mail";
-
-  if(state.productProfile === "royal_mail"){
-    if(!state.rmSelectedKey){
-      state.rmSelectedKey = "rm_other_not_listed";
-      state.rmOtherSelected = true;
-      state.rmBlockedKey = null;
-    }
-  } else if(!state.prohibitedOtherSelected && !state.prohibitedKey){
-    state.prohibitedOtherSelected = true;
+  if(!state.rmSelectedKey){
+    state.rmSelectedKey = "rm_other_not_listed";
+    state.rmOtherSelected = true;
+    state.rmBlockedKey = null;
   }
 
   if(state.format && !state.formatConfirmed) state.formatConfirmed = true;
@@ -589,13 +585,25 @@ function applyQuickDemoDefaults(){
   if(!state.senderAddress) state.senderAddress = "185 Farringdon Road, London";
   if(state.destination === "uk" && isBTPostcode(state.recipientPostcode)){
     if(!state.niCustomsReference) state.niCustomsReference = "NI-EXAMPLE-001";
+    if(!state.niSpsCategory) state.niSpsCategory = "no";
+    if(!state.niPrivateIndividual) state.niPrivateIndividual = "yes";
     state.niCustomsConfirmed = true;
   }
   state.proofOfDelivery = true;
 
   const options = availableServices();
   if(options.length && !options.some(s=>s.id===state.selectedServiceId)){
-    state.selectedServiceId = options[0].id;
+    const rmOption = options.find(s => s.profile === "royal_mail");
+    state.selectedServiceId = rmOption ? rmOption.id : options[0].id;
+  }
+  const selected = selectedService();
+  if(selected){
+    state.productProfile = selected.profile;
+  }
+  if(selected && selected.profile === "evri_dpd"){
+    state.evriAdditionalSelection = "clear";
+    state.evriAdditionalBlocked = false;
+    state.evriScreeningComplete = true;
   }
 
   if(!state.paymentMethod) state.paymentMethod = "card";
@@ -629,14 +637,8 @@ function render(){
   updateProgress();
 
   if(state.step === 1) renderWeigh();
-  else if(state.step === 2) {
-    if(state.productProfile === "royal_mail") renderRMDangerous();
-    else renderProhibited();
-  }
-  else if(state.step === 3) {
-    if(state.productProfile === "royal_mail") renderRMConditions();
-    else renderPolicyChecks();
-  }
+  else if(state.step === 2) renderRMDangerous();
+  else if(state.step === 3) renderRMConditions();
   else if(state.step === 4) renderCaptureItemDetails();
   else if(state.step === 5) renderDeclareValueAndContent();
   else if(state.step === 6) renderFilterAndPresentOptions();
@@ -675,7 +677,7 @@ function renderWeigh(){
       </div>
       <div class="card">
         <h3>Journey setup</h3>
-        <p>Set destination, format classification, and product family.</p>
+        <p>Set destination and format classification.</p>
         <div class="choiceGroup">
           <div class="choiceRow" id="destChoices">
             <button type="button" class="choiceBtn ${state.destination==="uk"?"active":""}" data-value="uk">
@@ -700,16 +702,7 @@ function renderWeigh(){
             <span>Parcel</span>
           </button>
         </div>
-        <div class="helpNote">Destination determines restricted and prohibited rules.</div>
-        <p style="margin:12px 0 8px;color:var(--muted);font-size:13px;">Which product family are you checking?</p>
-        <div class="choiceRow" id="profileChoices">
-          <button type="button" class="choiceBtn ${state.productProfile==="evri_dpd"?"active":""}" data-value="evri_dpd">
-            <span>EVRi / DPD</span>
-          </button>
-          <button type="button" class="choiceBtn ${state.productProfile==="royal_mail"?"active":""}" data-value="royal_mail">
-            <span>Royal Mail</span>
-          </button>
-        </div>
+        <div class="helpNote">All customers go through Royal Mail dangerous goods screening first. Carrier-specific checks happen later after product selection.</div>
         <label style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-weight:700;">
           <input type="checkbox" id="quickDemoToggle" ${state.quickDemoMode ? "checked" : ""}/>
           <span>Demo fast-track mode: auto-fill example values on every stage so the journey can be completed by clicking Continue only.</span>
@@ -721,16 +714,30 @@ function renderWeigh(){
     state.weightG = e.target.value.replace(/[^\d]/g,"").slice(0,6);
     e.target.value = state.weightG;
     state.selectedServiceId = "";
+    state.productProfile = "royal_mail";
+    state.evriAdditionalSelection = "";
+    state.evriAdditionalBlocked = false;
+    state.evriScreeningComplete = false;
+    state.evriLossOnlySelected = false;
+    state.evriNoCompSelected = false;
   });
   document.querySelectorAll("#destChoices .choiceBtn").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       state.destination = btn.dataset.value || "";
       state.selectedServiceId = "";
+      state.productProfile = "royal_mail";
       state.niCustomsConfirmed = false;
       state.niCustomsReference = "";
+      state.niSpsCategory = "";
+      state.niPrivateIndividual = "";
       state.rmSelectedKey = null;
       state.rmBlockedKey = null;
       state.rmOtherSelected = false;
+      state.evriAdditionalSelection = "";
+      state.evriAdditionalBlocked = false;
+      state.evriScreeningComplete = false;
+      state.evriLossOnlySelected = false;
+      state.evriNoCompSelected = false;
       document.querySelectorAll("#destChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
       setDestinationPill();
     });
@@ -740,22 +747,13 @@ function renderWeigh(){
       state.format = btn.dataset.value || "";
       state.formatConfirmed = false;
       state.selectedServiceId = "";
+      state.productProfile = "royal_mail";
+      state.evriAdditionalSelection = "";
+      state.evriAdditionalBlocked = false;
+      state.evriScreeningComplete = false;
+      state.evriLossOnlySelected = false;
+      state.evriNoCompSelected = false;
       document.querySelectorAll("#formatChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
-    });
-  });
-  document.querySelectorAll("#profileChoices .choiceBtn").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      state.productProfile = btn.dataset.value || "evri_dpd";
-      state.prohibitedKey = null;
-      state.prohibitedOtherSelected = false;
-      state.rmSelectedKey = null;
-      state.rmBlockedKey = null;
-      state.rmOtherSelected = false;
-      state.restrictedKeys = new Set();
-      state.coverLossOnlyKeys = new Set();
-      state.coverNoCompKeys = new Set();
-      state.selectedServiceId = "";
-      document.querySelectorAll("#profileChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
     });
   });
   document.getElementById("quickDemoToggle").addEventListener("change", (e)=>{
@@ -1042,7 +1040,8 @@ function renderPolicyChecks(){
 function renderCaptureItemDetails(){
   const fmt = ({letter:"Letter", large_letter:"Large letter", parcel:"Parcel"})[state.format] || "Not set";
   const dest = state.destination === "uk" ? "UK Inland" : "International";
-  const profile = state.productProfile === "royal_mail" ? "Royal Mail" : "EVRi / DPD";
+  const service = selectedService();
+  const profile = service ? (service.profile === "royal_mail" ? "Royal Mail" : "EVRi / DPD") : "Not selected yet";
 
   screen.innerHTML = `
     <div class="stepHeader">
@@ -1135,6 +1134,8 @@ function renderDeclareValueAndContent(){
 function renderFilterAndPresentOptions(){
   const services = availableServices();
   const showNI = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
+  const chosenService = selectedService();
+  const needsEvriAdditional = !!(chosenService && chosenService.profile === "evri_dpd");
 
   screen.innerHTML = `
     <div class="stepHeader">
@@ -1179,13 +1180,23 @@ function renderFilterAndPresentOptions(){
 
         ${showNI ? `
           <div class="helpNote" style="margin-top:12px;">
-            <strong>Northern Ireland support (KIOSK-867):</strong><br/>
-            BT postcode detected. Capture required customs/tariff support information before proceeding.
+            <strong>Northern Ireland / Windsor Framework support (KIOSK-867):</strong><br/>
+            BT postcode detected. Additional questions are required.
           </div>
-          <input id="niReferenceInput" placeholder="NI contents reference" value="${escapeHtml(state.niCustomsReference)}" style="margin-top:8px;" />
+          <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Does parcel include sanitary/phytosanitary goods (e.g. meat, dairy, plants)?</p>
+          <div class="choiceRow" id="niSpsChoices">
+            <button type="button" class="choiceBtn ${state.niSpsCategory==="no"?"active":""}" data-value="no"><span>No</span></button>
+            <button type="button" class="choiceBtn ${state.niSpsCategory==="yes"?"active":""}" data-value="yes"><span>Yes</span></button>
+          </div>
+          <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Is this being sent to a private individual?</p>
+          <div class="choiceRow" id="niPrivateChoices">
+            <button type="button" class="choiceBtn ${state.niPrivateIndividual==="yes"?"active":""}" data-value="yes"><span>Yes</span></button>
+            <button type="button" class="choiceBtn ${state.niPrivateIndividual==="no"?"active":""}" data-value="no"><span>No</span></button>
+          </div>
+          <input id="niReferenceInput" placeholder="NI/Windsor declaration reference" value="${escapeHtml(state.niCustomsReference)}" style="margin-top:8px;" />
           <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-weight:700;">
             <input type="checkbox" id="niConfirmed" ${state.niCustomsConfirmed ? "checked" : ""}/>
-            <span>I confirm NI support information has been captured.</span>
+            <span>I confirm NI/Windsor information has been captured and validated.</span>
           </label>
         ` : ""}
 
@@ -1194,15 +1205,30 @@ function renderFilterAndPresentOptions(){
           <span>Offer proof of delivery optional add-on (KIOSK-416)</span>
         </label>
 
-        ${state.productProfile === "evri_dpd" && state.coverNoCompKeys.size > 0 ? `
-          <div class="banner danger show" style="display:block; margin-top:10px;">
-            Compensation warning (KIOSK-795): no-compensation item category selected.
+        ${needsEvriAdditional ? `
+          <div class="helpNote" style="margin-top:12px;">
+            <strong>EVRi/DPD additional screening required:</strong> complete carrier-specific checks before basket.
           </div>
-        ` : ""}
-        ${state.productProfile === "evri_dpd" && state.coverLossOnlyKeys.size > 0 ? `
-          <div class="banner warn show" style="display:block; margin-top:10px;">
-            Compensation warning (KIOSK-795): item protected for loss only.
+          <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Does the item contain an EVRi/DPD prohibited category?</p>
+          <div class="choiceRow" id="evriDangerousChoices">
+            <button type="button" class="choiceBtn ${state.evriAdditionalSelection==="blocked"?"active":""}" data-value="blocked"><span>Yes, prohibited item</span></button>
+            <button type="button" class="choiceBtn ${state.evriAdditionalSelection==="clear"?"active":""}" data-value="clear"><span>No, other/not listed</span></button>
           </div>
+          <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-weight:700;">
+            <input type="checkbox" id="evriLossOnlyInput" ${state.evriLossOnlySelected ? "checked" : ""}/>
+            <span>Item is in loss-only compensation category</span>
+          </label>
+          <label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-weight:700;">
+            <input type="checkbox" id="evriNoCompInput" ${state.evriNoCompSelected ? "checked" : ""}/>
+            <span>Item is in no-compensation category</span>
+          </label>
+          ${state.evriAdditionalSelection==="blocked" ? `
+            <div class="banner danger show" style="display:block; margin-top:10px;">EVRi/DPD prohibited item selected. Cannot proceed with this service.</div>
+          ` : state.evriAdditionalSelection==="clear" ? `
+            <div class="banner ok show" style="display:block; margin-top:10px;">EVRi/DPD additional screening passed.</div>
+          ` : `
+            <div class="banner warn show" style="display:block; margin-top:10px;">Select an EVRi/DPD screening outcome to continue.</div>
+          `}
         ` : ""}
       </div>
     </div>
@@ -1214,6 +1240,12 @@ function renderFilterAndPresentOptions(){
       const validIds = new Set(availableServices().map(s => s.id));
       if(!validIds.has(state.selectedServiceId)){
         state.selectedServiceId = "";
+        state.productProfile = "royal_mail";
+        state.evriAdditionalSelection = "";
+        state.evriAdditionalBlocked = false;
+        state.evriScreeningComplete = false;
+        state.evriLossOnlySelected = false;
+        state.evriNoCompSelected = false;
       }
       render();
     });
@@ -1222,7 +1254,16 @@ function renderFilterAndPresentOptions(){
   document.querySelectorAll("#serviceChoices .choiceBtn[data-service-id]").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       state.selectedServiceId = btn.dataset.serviceId || "";
-      document.querySelectorAll("#serviceChoices .choiceBtn[data-service-id]").forEach(b=>b.classList.toggle("active", b===btn));
+      const chosen = selectedService();
+      state.productProfile = chosen ? chosen.profile : "royal_mail";
+      if(state.productProfile !== "evri_dpd"){
+        state.evriAdditionalSelection = "";
+        state.evriAdditionalBlocked = false;
+        state.evriScreeningComplete = false;
+        state.evriLossOnlySelected = false;
+        state.evriNoCompSelected = false;
+      }
+      render();
     });
   });
 
@@ -1241,6 +1282,8 @@ function renderFilterAndPresentOptions(){
       if(!nowNI){
         state.niCustomsReference = "";
         state.niCustomsConfirmed = false;
+        state.niSpsCategory = "";
+        state.niPrivateIndividual = "";
       }
       render();
     }
@@ -1257,6 +1300,39 @@ function renderFilterAndPresentOptions(){
   }
   if(niConfirm){
     niConfirm.addEventListener("change", (e)=>{ state.niCustomsConfirmed = !!e.target.checked; });
+  }
+  const niSpsChoices = document.querySelectorAll("#niSpsChoices .choiceBtn");
+  niSpsChoices.forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.niSpsCategory = btn.dataset.value || "";
+      niSpsChoices.forEach(b=>b.classList.toggle("active", b===btn));
+    });
+  });
+  const niPrivateChoices = document.querySelectorAll("#niPrivateChoices .choiceBtn");
+  niPrivateChoices.forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.niPrivateIndividual = btn.dataset.value || "";
+      niPrivateChoices.forEach(b=>b.classList.toggle("active", b===btn));
+    });
+  });
+
+  const evriChoices = document.querySelectorAll("#evriDangerousChoices .choiceBtn");
+  evriChoices.forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.evriAdditionalSelection = btn.dataset.value || "";
+      state.evriAdditionalBlocked = state.evriAdditionalSelection === "blocked";
+      state.evriScreeningComplete = !!state.evriAdditionalSelection;
+      evriChoices.forEach(b=>b.classList.toggle("active", b===btn));
+      render();
+    });
+  });
+  const evriLossOnly = document.getElementById("evriLossOnlyInput");
+  const evriNoComp = document.getElementById("evriNoCompInput");
+  if(evriLossOnly){
+    evriLossOnly.addEventListener("change", (e)=>{ state.evriLossOnlySelected = !!e.target.checked; });
+  }
+  if(evriNoComp){
+    evriNoComp.addEventListener("change", (e)=>{ state.evriNoCompSelected = !!e.target.checked; });
   }
 }
 
@@ -1373,7 +1449,8 @@ function renderPrintAndConfirm(){
 function renderSummary(){
   const dest = state.destination === "uk" ? "UK" : (state.destination === "intl" ? "International" : "Not set");
   const fmt = ({letter:"Letter", large_letter:"Large letter", parcel:"Parcel"})[state.format] || "Not set";
-  const profile = state.productProfile === "royal_mail" ? "Royal Mail rules" : "EVRi/DPD rules";
+  const service = selectedService();
+  const profile = service ? (service.profile === "royal_mail" ? "Royal Mail rules" : "EVRi/DPD rules") : "Not selected";
 
   const restrictedLabels = [...state.restrictedKeys].map(k => RESTRICTED.find(x=>x.key===k)?.label).filter(Boolean);
   const lossLabels = [...state.coverLossOnlyKeys].map(k => LOSS_ONLY.find(x=>x.key===k)?.label).filter(Boolean);
@@ -1404,38 +1481,33 @@ function renderSummary(){
       <div class="card">
         <h3>Screening flags</h3>
 
-        ${state.productProfile === "royal_mail" ? `
-          ${state.rmBlockedKey ? `
-            <div class="banner danger show" style="display:block;">
-              Royal Mail blocked selection: ${escapeHtml(RM_FILTER.find(x=>x.key===state.rmBlockedKey)?.label || state.rmBlockedKey)}.
-            </div>
-          ` : `
-            <div class="banner ok show" style="display:block;">
-              Royal Mail dangerous goods filter completed.
-            </div>
-          `}
+        ${state.rmBlockedKey ? `
+          <div class="banner danger show" style="display:block;">
+            Royal Mail blocked selection: ${escapeHtml(RM_FILTER.find(x=>x.key===state.rmBlockedKey)?.label || state.rmBlockedKey)}.
+          </div>
         ` : `
-          ${state.prohibitedKey ? `
-            <div class="banner danger show" style="display:block;">
-              Prohibited selection was made: ${escapeHtml(PROHIBITED.find(x=>x.key===state.prohibitedKey)?.label || state.prohibitedKey)} (journey would stop).
+          <div class="banner ok show" style="display:block;">
+            Royal Mail dangerous goods filter completed.
+          </div>
+        `}
+        ${service && service.profile === "evri_dpd" ? `
+          ${state.evriAdditionalBlocked ? `
+            <div class="banner danger show" style="display:block; margin-top:8px;">
+              EVRi/DPD additional screening: prohibited item selected.
             </div>
           ` : `
-            <div class="banner ok show" style="display:block;">
-              No prohibited items selected.
+            <div class="banner ok show" style="display:block; margin-top:8px;">
+              EVRi/DPD additional screening passed.
             </div>
           `}
-        `}
+        ` : ""}
 
         <div style="margin-top:10px;">
           <div class="helpNote">
-            ${state.productProfile === "royal_mail" ? `
-              <strong>RM filter selection:</strong> ${escapeHtml(rmSelected)}<br/>
-              <strong>RM conditions:</strong> Standard Royal Mail checks reviewed
-            ` : `
-              <strong>Restricted:</strong> ${restrictedLabels.length ? escapeHtml(restrictedLabels.join(", ")) : "None"}<br/>
-              <strong>Loss-only:</strong> ${lossLabels.length ? escapeHtml(lossLabels.join(", ")) : "None"}<br/>
-              <strong>No-comp:</strong> ${ncLabels.length ? escapeHtml(ncLabels.join(", ")) : "None"}
-            `}
+            <strong>RM filter selection:</strong> ${escapeHtml(rmSelected)}<br/>
+            <strong>EVRi/DPD loss-only flag:</strong> ${state.evriLossOnlySelected ? "Yes" : "No"}<br/>
+            <strong>EVRi/DPD no-comp flag:</strong> ${state.evriNoCompSelected ? "Yes" : "No"}<br/>
+            <strong>Legacy restricted flags:</strong> ${restrictedLabels.length ? escapeHtml(restrictedLabels.join(", ")) : "None"} / ${lossLabels.length ? escapeHtml(lossLabels.join(", ")) : "None"} / ${ncLabels.length ? escapeHtml(ncLabels.join(", ")) : "None"}
           </div>
         </div>
       </div>
@@ -1550,14 +1622,10 @@ function wireMultiSelectDetails(mode, list, setRef, detailsMode="r"){
    Navigation rules
 ---------------------------- */
 function canContinue(){
-  if(state.step === 1) return !!state.weightG && !!state.destination && !!state.format && !!state.productProfile;
+  if(state.step === 1) return !!state.weightG && !!state.destination && !!state.format;
 
   if(state.step === 2){
-    if(state.productProfile === "royal_mail"){
-      return (state.rmOtherSelected || !!state.rmSelectedKey) && !state.rmBlockedKey;
-    }
-    // EVRi/DPD step 2 requires explicit acknowledgement via "Other / not listed".
-    return state.prohibitedOtherSelected && !state.prohibitedKey;
+    return (state.rmOtherSelected || !!state.rmSelectedKey) && !state.rmBlockedKey;
   }
 
   if(state.step === 4){
@@ -1572,8 +1640,9 @@ function canContinue(){
     const hasAddresses = !!state.recipientPostcode && !!state.recipientAddress && !!state.senderPostcode && !!state.senderAddress;
     const hasService = !!state.selectedServiceId;
     const needsNI = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
-    const niOk = !needsNI || (!!state.niCustomsReference && state.niCustomsConfirmed);
-    return hasAddresses && hasService && niOk;
+    const niOk = !needsNI || (!!state.niCustomsReference && !!state.niSpsCategory && !!state.niPrivateIndividual && state.niCustomsConfirmed);
+    const evriOk = state.productProfile !== "evri_dpd" || (state.evriScreeningComplete && !state.evriAdditionalBlocked);
+    return hasAddresses && hasService && niOk && evriOk;
   }
 
   if(state.step === 7){
@@ -1591,19 +1660,11 @@ function next(){
 
   if(!canContinue()){
     if(state.step === 2){
-      if(state.productProfile === "royal_mail"){
-        if(state.rmBlockedKey){
-          alert("This item is not allowed for the selected destination under Royal Mail rules.");
-          return;
-        }
-        alert("Please select a Royal Mail category or choose 'Other / not listed'.");
+      if(state.rmBlockedKey){
+        alert("This item is not allowed for the selected destination under Royal Mail rules.");
         return;
       }
-      if(state.prohibitedKey){
-        alert("A prohibited item has been selected. In the live journey this would stop here.");
-        return;
-      }
-      alert("Please select 'Other / not listed' to confirm your item is not shown.");
+      alert("Please select a Royal Mail category or choose 'Other / not listed'.");
       return;
     }
     if(state.step === 4){
@@ -1615,7 +1676,11 @@ function next(){
       return;
     }
     if(state.step === 6){
-      alert("Complete address details, NI checks (if applicable), and select a service.");
+      if(state.productProfile === "evri_dpd" && state.evriAdditionalBlocked){
+        alert("EVRi/DPD prohibited item selected. Choose a different service or clear the screening result.");
+        return;
+      }
+      alert("Complete address details, NI/Windsor checks (if applicable), select a service, and finish carrier-specific screening.");
       return;
     }
     if(state.step === 7){
@@ -1644,12 +1709,18 @@ function resetAll(){
   state.weightG = "";
   state.format = "";
   state.destination = "";
-  state.productProfile = "evri_dpd";
+  state.productProfile = "royal_mail";
+  state.quickDemoMode = false;
   state.prohibitedKey = null;
   state.prohibitedOtherSelected = false;
   state.rmSelectedKey = null;
   state.rmBlockedKey = null;
   state.rmOtherSelected = false;
+  state.evriAdditionalSelection = "";
+  state.evriAdditionalBlocked = false;
+  state.evriScreeningComplete = false;
+  state.evriLossOnlySelected = false;
+  state.evriNoCompSelected = false;
   state.rmAdvisoryKeys = new Set();
   state.restrictedKeys = new Set();
   state.coverLossOnlyKeys = new Set();
@@ -1664,6 +1735,8 @@ function resetAll(){
   state.senderAddress = "";
   state.niCustomsConfirmed = false;
   state.niCustomsReference = "";
+  state.niSpsCategory = "";
+  state.niPrivateIndividual = "";
   state.proofOfDelivery = false;
   state.selectedServiceId = "";
   state.basketAdded = false;
