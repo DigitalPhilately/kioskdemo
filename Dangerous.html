@@ -245,6 +245,7 @@ const state = {
   format: "",
   destination: "",
   productProfile: "evri_dpd",
+  quickDemoMode: false,
   prohibitedKey: null,    // if set -> hard stop message
   prohibitedOtherSelected: false,
   rmSelectedKey: null,
@@ -560,6 +561,50 @@ function basketTotal(){
   return Number((base + pod).toFixed(2));
 }
 
+function applyQuickDemoDefaults(){
+  if(!state.quickDemoMode) return;
+
+  if(!state.weightG) state.weightG = "850";
+  if(!state.destination) state.destination = "uk";
+  if(!state.format) state.format = "parcel";
+  if(!state.productProfile) state.productProfile = "royal_mail";
+
+  if(state.productProfile === "royal_mail"){
+    if(!state.rmSelectedKey){
+      state.rmSelectedKey = "rm_other_not_listed";
+      state.rmOtherSelected = true;
+      state.rmBlockedKey = null;
+    }
+  } else if(!state.prohibitedOtherSelected && !state.prohibitedKey){
+    state.prohibitedOtherSelected = true;
+  }
+
+  if(state.format && !state.formatConfirmed) state.formatConfirmed = true;
+  if(!state.declaredValue) state.declaredValue = "39.99";
+  if(!state.contentDescription) state.contentDescription = "Books and stationery";
+  if(!state.deliverySpeed) state.deliverySpeed = "balanced";
+  if(!state.recipientPostcode) state.recipientPostcode = "BT1 5GS";
+  if(!state.recipientAddress) state.recipientAddress = "1 Royal Avenue, Belfast";
+  if(!state.senderPostcode) state.senderPostcode = "EC1A 1AA";
+  if(!state.senderAddress) state.senderAddress = "185 Farringdon Road, London";
+  if(state.destination === "uk" && isBTPostcode(state.recipientPostcode)){
+    if(!state.niCustomsReference) state.niCustomsReference = "NI-EXAMPLE-001";
+    state.niCustomsConfirmed = true;
+  }
+  state.proofOfDelivery = true;
+
+  const options = availableServices();
+  if(options.length && !options.some(s=>s.id===state.selectedServiceId)){
+    state.selectedServiceId = options[0].id;
+  }
+
+  if(!state.paymentMethod) state.paymentMethod = "card";
+  state.paymentComplete = true;
+  if(!state.transactionRef){
+    state.transactionRef = "TX-DEMO01";
+  }
+}
+
 /* ---------------------------
    Rendering
 ---------------------------- */
@@ -579,6 +624,7 @@ function updateProgress(){
 }
 
 function render(){
+  applyQuickDemoDefaults();
   setDestinationPill();
   updateProgress();
 
@@ -614,22 +660,22 @@ function renderWeigh(){
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Item details</h1>
-        <p class="subtitle">Enter weight, size and destination in one step.</p>
+        <h1>Launch Postage Journey (KIOSK-401)</h1>
+        <p class="subtitle">Capture item-on-scales details and journey context before dangerous goods screening.</p>
       </div>
-      <span class="pill"><span class="material-symbols-outlined">scale</span> Weight + Size + Destination</span>
+      <span class="pill"><span class="material-symbols-outlined">scale</span> Item On Scales (KIOSK-404)</span>
     </div>
 
     <div class="formRow">
       <div class="card">
-        <h3>Weight (grams)</h3>
-        <p>In production this is captured automatically.</p>
+        <h3>Capture weight (KIOSK-404)</h3>
+        <p>In production this is captured automatically from scales.</p>
         <input id="weightInput" inputmode="numeric" placeholder="e.g. 350" value="${escapeHtml(state.weightG)}" />
-        <div class="helpNote">Next step is the prohibited items check.</div>
+        <div class="helpNote">Next: screen for prohibited or restricted items (KIOSK-409).</div>
       </div>
       <div class="card">
-        <h3>Destination and size</h3>
-        <p>Where are you sending this?</p>
+        <h3>Journey setup</h3>
+        <p>Set destination, format classification, and product family.</p>
         <div class="choiceGroup">
           <div class="choiceRow" id="destChoices">
             <button type="button" class="choiceBtn ${state.destination==="uk"?"active":""}" data-value="uk">
@@ -664,6 +710,10 @@ function renderWeigh(){
             <span>Royal Mail</span>
           </button>
         </div>
+        <label style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-weight:700;">
+          <input type="checkbox" id="quickDemoToggle" ${state.quickDemoMode ? "checked" : ""}/>
+          <span>Demo fast-track mode: auto-fill example values on every stage so the journey can be completed by clicking Continue only.</span>
+        </label>
       </div>
     </div>
   `;
@@ -708,6 +758,13 @@ function renderWeigh(){
       document.querySelectorAll("#profileChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
     });
   });
+  document.getElementById("quickDemoToggle").addEventListener("change", (e)=>{
+    state.quickDemoMode = !!e.target.checked;
+    if(state.quickDemoMode){
+      applyQuickDemoDefaults();
+    }
+    render();
+  });
 }
 
 function renderProhibited(){
@@ -726,10 +783,10 @@ function renderProhibited(){
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>What’s inside your item?</h1>
-        <p class="subtitle"><strong>The following items (or any item similar in description or content) cannot be carried on any service.</strong> Select one option to continue.</p>
+        <h1>Screen for prohibited or restricted items (KIOSK-409)</h1>
+        <p class="subtitle"><strong>Check contents against prohibited categories.</strong> Select one option to continue.</p>
       </div>
-      <span class="pill"><span class="material-symbols-outlined">block</span> Prohibited (hard stop)</span>
+      <span class="pill"><span class="material-symbols-outlined">block</span> Prohibited check (KIOSK-410)</span>
     </div>
 
     <div class="gridWrap">
@@ -776,10 +833,10 @@ function renderRMDangerous(){
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Royal Mail dangerous goods</h1>
-        <p class="subtitle"><strong>Does your item contain any of the following categories?</strong> Rules shown are based on destination (${isUK ? "UK" : "International"}).</p>
+        <h1>Screen for prohibited or restricted items (KIOSK-409)</h1>
+        <p class="subtitle"><strong>Royal Mail dangerous goods filter.</strong> Rules shown are based on destination (${isUK ? "UK" : "International"}).</p>
       </div>
-      <span class="pill"><span class="material-symbols-outlined">local_shipping</span> RM filter</span>
+      <span class="pill"><span class="material-symbols-outlined">local_shipping</span> RM filter (KIOSK-410)</span>
     </div>
 
     <div class="gridWrap">
@@ -874,10 +931,10 @@ function renderRMConditions(){
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Royal Mail decision</h1>
-        <p class="subtitle">Clear outcome and required checks for this item.</p>
+        <h1>Handle restricted outcome (KIOSK-410)</h1>
+        <p class="subtitle">Confirm handling decision before capture item details.</p>
       </div>
-      <span class="pill"><span class="material-symbols-outlined">gavel</span> RM checks</span>
+      <span class="pill"><span class="material-symbols-outlined">gavel</span> RM handling</span>
     </div>
 
     <div class="formRow">
@@ -907,10 +964,10 @@ function renderPolicyChecks(){
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Restricted and compensation checks</h1>
-        <p class="subtitle">Select any categories that match your item.</p>
+        <h1>Handle restricted outcome (KIOSK-410)</h1>
+        <p class="subtitle">Confirm restricted and compensation context before item-detail capture.</p>
       </div>
-      <span class="pill"><span class="material-symbols-outlined">shield</span> Protection rules</span>
+      <span class="pill"><span class="material-symbols-outlined">shield</span> Restricted handling</span>
     </div>
 
     <div class="card" style="margin-bottom:14px;">
