@@ -229,7 +229,7 @@
 
     <div class="bottombar">
       <button class="btn danger" id="cancelBtn"><span class="material-symbols-outlined">close</span>Cancel</button>
-      <div class="progress" id="progress">Step 1 of 7</div>
+      <div class="progress" id="progress">Step 1 of 8</div>
       <button class="btn primary" id="nextBtn">Continue <span class="material-symbols-outlined">arrow_forward</span></button>
     </div>
   </div>
@@ -240,7 +240,7 @@
    State
 ---------------------------- */
 const state = {
-  step: 1,                // 1..5
+  step: 1,                // 1..8
   weightG: "",
   format: "",
   destination: "",
@@ -254,6 +254,23 @@ const state = {
   restrictedKeys: new Set(),
   coverLossOnlyKeys: new Set(),
   coverNoCompKeys: new Set(),
+  formatConfirmed: false,
+  declaredValue: "",
+  contentDescription: "",
+  deliverySpeed: "balanced",
+  recipientPostcode: "",
+  recipientAddress: "",
+  senderPostcode: "",
+  senderAddress: "",
+  niCustomsConfirmed: false,
+  niCustomsReference: "",
+  proofOfDelivery: false,
+  selectedServiceId: "",
+  basketAdded: false,
+  paymentMethod: "",
+  paymentComplete: false,
+  labelsPrinted: false,
+  transactionRef: "",
 };
 
 /* ---------------------------
@@ -453,6 +470,19 @@ const NO_COMP = [
     details:"No compensation: watches are carried at sender risk." },
 ];
 
+// SERVICE CATALOGUE (demo only)
+const SERVICES = [
+  { id:"evri_standard", profile:"evri_dpd", name:"EVRi Standard", speed:"balanced", tracked:true, intl:false, maxWeight:15000, basePrice:3.69 },
+  { id:"dpd_next_day", profile:"evri_dpd", name:"DPD Next Day", speed:"fast", tracked:true, intl:false, maxWeight:20000, basePrice:6.99 },
+  { id:"dpd_classic", profile:"evri_dpd", name:"DPD Classic", speed:"balanced", tracked:true, intl:false, maxWeight:30000, basePrice:5.49 },
+  { id:"evri_international", profile:"evri_dpd", name:"EVRi International", speed:"balanced", tracked:true, intl:true, maxWeight:10000, basePrice:9.99 },
+  { id:"rm_2nd_class", profile:"royal_mail", name:"Royal Mail 2nd Class", speed:"balanced", tracked:false, intl:false, maxWeight:20000, basePrice:3.39 },
+  { id:"rm_1st_class", profile:"royal_mail", name:"Royal Mail 1st Class", speed:"fast", tracked:false, intl:false, maxWeight:20000, basePrice:4.59 },
+  { id:"rm_tracked_48", profile:"royal_mail", name:"RM Tracked 48", speed:"balanced", tracked:true, intl:false, maxWeight:20000, basePrice:4.99 },
+  { id:"rm_tracked_24", profile:"royal_mail", name:"RM Tracked 24", speed:"fast", tracked:true, intl:false, maxWeight:20000, basePrice:6.29 },
+  { id:"rm_international_tracked", profile:"royal_mail", name:"RM International Tracked", speed:"balanced", tracked:true, intl:true, maxWeight:2000, basePrice:11.99 },
+];
+
 /* ---------------------------
    Helpers
 ---------------------------- */
@@ -480,6 +510,56 @@ function setDestinationPill(){
   destLabel.textContent = state.destination === "uk" ? "UK" : "International";
 }
 
+function isBTPostcode(value){
+  return /^BT/i.test((value || "").trim());
+}
+
+function numericValue(value){
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function selectedService(){
+  return SERVICES.find(s => s.id === state.selectedServiceId) || null;
+}
+
+function calculateServicePrice(service){
+  const weight = Number.parseInt(state.weightG || "0", 10) || 0;
+  const weightAdd = weight > 2000 ? Math.ceil((weight - 2000) / 1000) * 0.35 : 0;
+  return Number((service.basePrice + weightAdd).toFixed(2));
+}
+
+function availableServices(){
+  const weight = Number.parseInt(state.weightG || "0", 10) || 0;
+  const isIntl = state.destination === "intl";
+  const needsTracked = state.productProfile === "evri_dpd" && state.restrictedKeys.size > 0;
+
+  let list = SERVICES.filter(s => s.profile === state.productProfile);
+  list = list.filter(s => s.maxWeight >= weight);
+  list = list.filter(s => isIntl ? s.intl : true);
+  if(!isIntl) list = list.filter(s => s.intl ? false : true);
+
+  if(state.deliverySpeed === "fast"){
+    list = list.filter(s => s.speed === "fast");
+  } else if(state.deliverySpeed === "tracked"){
+    list = list.filter(s => s.tracked);
+  }
+  if(needsTracked){
+    list = list.filter(s => s.tracked);
+  }
+
+  // Prioritise tracked services in display order (mirrors KIOSK-415 intent).
+  return list.sort((a,b) => Number(b.tracked) - Number(a.tracked) || calculateServicePrice(a) - calculateServicePrice(b));
+}
+
+function basketTotal(){
+  const service = selectedService();
+  if(!service) return 0;
+  const base = calculateServicePrice(service);
+  const pod = state.proofOfDelivery ? 1.5 : 0;
+  return Number((base + pod).toFixed(2));
+}
+
 /* ---------------------------
    Rendering
 ---------------------------- */
@@ -491,7 +571,7 @@ const resetBtn = document.getElementById("resetBtn");
 const cancelBtn = document.getElementById("cancelBtn");
 const helpBtn = document.getElementById("helpBtn");
 
-function stepCount(){ return 4; }
+function stepCount(){ return 8; }
 
 function updateProgress(){
   progress.textContent = `Step ${state.step} of ${stepCount()}`;
@@ -511,9 +591,23 @@ function render(){
     if(state.productProfile === "royal_mail") renderRMConditions();
     else renderPolicyChecks();
   }
-  else renderSummary();
+  else if(state.step === 4) renderCaptureItemDetails();
+  else if(state.step === 5) renderDeclareValueAndContent();
+  else if(state.step === 6) renderFilterAndPresentOptions();
+  else if(state.step === 7) renderBasketAndPay();
+  else renderPrintAndConfirm();
 
-  nextBtn.innerHTML = `Continue <span class="material-symbols-outlined">arrow_forward</span>`;
+  if(state.step === 8){
+    nextBtn.innerHTML = `Start new transaction <span class="material-symbols-outlined">restart_alt</span>`;
+  } else if(state.step === 7){
+    nextBtn.innerHTML = `Proceed to print <span class="material-symbols-outlined">arrow_forward</span>`;
+  } else if(state.step === 6){
+    nextBtn.innerHTML = `Add to basket <span class="material-symbols-outlined">add_shopping_cart</span>`;
+  } else if(state.step === 5){
+    nextBtn.innerHTML = `Filter services <span class="material-symbols-outlined">filter_list</span>`;
+  } else {
+    nextBtn.innerHTML = `Continue <span class="material-symbols-outlined">arrow_forward</span>`;
+  }
 }
 
 function renderWeigh(){
@@ -576,10 +670,17 @@ function renderWeigh(){
   document.getElementById("weightInput").addEventListener("input", (e)=> {
     state.weightG = e.target.value.replace(/[^\d]/g,"").slice(0,6);
     e.target.value = state.weightG;
+    state.selectedServiceId = "";
   });
   document.querySelectorAll("#destChoices .choiceBtn").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       state.destination = btn.dataset.value || "";
+      state.selectedServiceId = "";
+      state.niCustomsConfirmed = false;
+      state.niCustomsReference = "";
+      state.rmSelectedKey = null;
+      state.rmBlockedKey = null;
+      state.rmOtherSelected = false;
       document.querySelectorAll("#destChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
       setDestinationPill();
     });
@@ -587,12 +688,23 @@ function renderWeigh(){
   document.querySelectorAll("#formatChoices .choiceBtn").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       state.format = btn.dataset.value || "";
+      state.formatConfirmed = false;
+      state.selectedServiceId = "";
       document.querySelectorAll("#formatChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
     });
   });
   document.querySelectorAll("#profileChoices .choiceBtn").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       state.productProfile = btn.dataset.value || "evri_dpd";
+      state.prohibitedKey = null;
+      state.prohibitedOtherSelected = false;
+      state.rmSelectedKey = null;
+      state.rmBlockedKey = null;
+      state.rmOtherSelected = false;
+      state.restrictedKeys = new Set();
+      state.coverLossOnlyKeys = new Set();
+      state.coverNoCompKeys = new Set();
+      state.selectedServiceId = "";
       document.querySelectorAll("#profileChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
     });
   });
@@ -870,6 +982,337 @@ function renderPolicyChecks(){
   });
 }
 
+function renderCaptureItemDetails(){
+  const fmt = ({letter:"Letter", large_letter:"Large letter", parcel:"Parcel"})[state.format] || "Not set";
+  const dest = state.destination === "uk" ? "UK Inland" : "International";
+  const profile = state.productProfile === "royal_mail" ? "Royal Mail" : "EVRi / DPD";
+
+  screen.innerHTML = `
+    <div class="stepHeader">
+      <div>
+        <h1>Capture Item Details (KIOSK-403)</h1>
+        <p class="subtitle">Confirm format classification from sidecar and lock item details before value declaration.</p>
+      </div>
+      <span class="pill"><span class="material-symbols-outlined">inventory_2</span> Item details</span>
+    </div>
+
+    <div class="formRow">
+      <div class="card">
+        <h3>Item offered to format sidecar</h3>
+        <div style="margin-top:10px;">
+          <span class="tag"><span class="material-symbols-outlined">scale</span> ${escapeHtml(state.weightG || "—")} g</span>
+          <span class="tag"><span class="material-symbols-outlined">straighten</span> ${fmt}</span>
+          <span class="tag"><span class="material-symbols-outlined">public</span> ${dest}</span>
+          <span class="tag"><span class="material-symbols-outlined">local_shipping</span> ${profile}</span>
+        </div>
+        <div class="helpNote">KIOSK-405 Confirm format classification before continuing.</div>
+      </div>
+      <div class="card">
+        <h3>Confirm format classification</h3>
+        <div class="choiceRow3" id="captureFormatChoices">
+          <button type="button" class="choiceBtn ${state.format==="letter"?"active":""}" data-value="letter"><span>Letter</span></button>
+          <button type="button" class="choiceBtn ${state.format==="large_letter"?"active":""}" data-value="large_letter"><span>Large Letter</span></button>
+          <button type="button" class="choiceBtn ${state.format==="parcel"?"active":""}" data-value="parcel"><span>Parcel</span></button>
+        </div>
+        <label style="display:flex;gap:8px;align-items:flex-start;margin-top:14px;font-weight:700;">
+          <input type="checkbox" id="formatConfirmed" ${state.formatConfirmed ? "checked" : ""}/>
+          <span>I confirm the sidecar classification is correct.</span>
+        </label>
+      </div>
+    </div>
+  `;
+
+  document.querySelectorAll("#captureFormatChoices .choiceBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.format = btn.dataset.value || state.format;
+      state.formatConfirmed = false;
+      document.querySelectorAll("#captureFormatChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
+      document.getElementById("formatConfirmed").checked = false;
+    });
+  });
+  document.getElementById("formatConfirmed").addEventListener("change", (e)=>{
+    state.formatConfirmed = !!e.target.checked;
+  });
+}
+
+function renderDeclareValueAndContent(){
+  screen.innerHTML = `
+    <div class="stepHeader">
+      <div>
+        <h1>Declare Item Value and Content (KIOSK-406)</h1>
+        <p class="subtitle">Capture declared value and contents description before service filtering.</p>
+      </div>
+      <span class="pill"><span class="material-symbols-outlined">payments</span> Value and content</span>
+    </div>
+
+    <div class="formRow">
+      <div class="card">
+        <h3>Declare item value (KIOSK-407)</h3>
+        <p>Enter the replacement value in GBP.</p>
+        <input id="declaredValueInput" inputmode="decimal" placeholder="e.g. 49.99" value="${escapeHtml(state.declaredValue)}" />
+      </div>
+      <div class="card">
+        <h3>Declare contents (KIOSK-408)</h3>
+        <p>Provide a plain-language description of the contents.</p>
+        <input id="contentDescInput" placeholder="e.g. Two paperback books" value="${escapeHtml(state.contentDescription)}" />
+        <div class="helpNote">This description is used for service filtering, customs support checks, and compensation messaging.</div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("declaredValueInput").addEventListener("input", (e)=>{
+    let raw = (e.target.value || "").replace(/[^0-9.]/g, "");
+    const firstDot = raw.indexOf(".");
+    if(firstDot !== -1){
+      raw = raw.slice(0, firstDot + 1) + raw.slice(firstDot + 1).replace(/\./g, "");
+    }
+    state.declaredValue = raw.slice(0, 10);
+    e.target.value = state.declaredValue;
+  });
+  document.getElementById("contentDescInput").addEventListener("input", (e)=>{
+    state.contentDescription = (e.target.value || "").slice(0, 120);
+    e.target.value = state.contentDescription;
+  });
+}
+
+function renderFilterAndPresentOptions(){
+  const services = availableServices();
+  const showNI = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
+
+  screen.innerHTML = `
+    <div class="stepHeader">
+      <div>
+        <h1>Filter and Present Postage Options (KIOSK-412)</h1>
+        <p class="subtitle">Apply delivery preference, restrictions, and routing to present valid services.</p>
+      </div>
+      <span class="pill"><span class="material-symbols-outlined">tune</span> Service filtering</span>
+    </div>
+
+    <div class="formRow">
+      <div class="card">
+        <h3>Delivery speed preference (KIOSK-427)</h3>
+        <div class="choiceRow3" id="speedChoices">
+          <button type="button" class="choiceBtn ${state.deliverySpeed==="balanced"?"active":""}" data-value="balanced"><span>Balanced</span></button>
+          <button type="button" class="choiceBtn ${state.deliverySpeed==="fast"?"active":""}" data-value="fast"><span>Fastest</span></button>
+          <button type="button" class="choiceBtn ${state.deliverySpeed==="tracked"?"active":""}" data-value="tracked"><span>Tracked only</span></button>
+        </div>
+        <div class="helpNote">KIOSK-413/KIOSK-415/KIOSK-428: services are pre-filtered by item data and restrictions, then tracked services are prioritised.</div>
+
+        <h3 style="margin-top:14px;">Available services (KIOSK-414)</h3>
+        <div class="choiceGroup" id="serviceChoices">
+          ${services.length ? services.map(service => `
+            <button type="button" class="choiceBtn ${state.selectedServiceId===service.id?"active":""}" data-service-id="${service.id}">
+              <span>${escapeHtml(service.name)}</span>
+              <span class="sub">${service.tracked ? "Tracked" : "Untracked"} • £${calculateServicePrice(service).toFixed(2)}</span>
+            </button>
+          `).join("") : `
+            <div class="banner danger show" style="display:block;">No services available for current filters. Adjust speed, details, or screening selections.</div>
+          `}
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Enter address details (KIOSK-866)</h3>
+        <p>Recipient details</p>
+        <input id="recipientPostcodeInput" placeholder="Recipient postcode (e.g. SW1A 1AA)" value="${escapeHtml(state.recipientPostcode)}" />
+        <input id="recipientAddressInput" placeholder="Recipient address line" value="${escapeHtml(state.recipientAddress)}" style="margin-top:8px;" />
+        <p style="margin-top:10px;">Sender details</p>
+        <input id="senderPostcodeInput" placeholder="Sender postcode" value="${escapeHtml(state.senderPostcode)}" />
+        <input id="senderAddressInput" placeholder="Sender address line" value="${escapeHtml(state.senderAddress)}" style="margin-top:8px;" />
+
+        ${showNI ? `
+          <div class="helpNote" style="margin-top:12px;">
+            <strong>Northern Ireland support (KIOSK-867):</strong><br/>
+            BT postcode detected. Capture required customs/tariff support information before proceeding.
+          </div>
+          <input id="niReferenceInput" placeholder="NI contents reference" value="${escapeHtml(state.niCustomsReference)}" style="margin-top:8px;" />
+          <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-weight:700;">
+            <input type="checkbox" id="niConfirmed" ${state.niCustomsConfirmed ? "checked" : ""}/>
+            <span>I confirm NI support information has been captured.</span>
+          </label>
+        ` : ""}
+
+        <label style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-weight:700;">
+          <input type="checkbox" id="proofDeliveryInput" ${state.proofOfDelivery ? "checked" : ""}/>
+          <span>Offer proof of delivery optional add-on (KIOSK-416)</span>
+        </label>
+
+        ${state.productProfile === "evri_dpd" && state.coverNoCompKeys.size > 0 ? `
+          <div class="banner danger show" style="display:block; margin-top:10px;">
+            Compensation warning (KIOSK-795): no-compensation item category selected.
+          </div>
+        ` : ""}
+        ${state.productProfile === "evri_dpd" && state.coverLossOnlyKeys.size > 0 ? `
+          <div class="banner warn show" style="display:block; margin-top:10px;">
+            Compensation warning (KIOSK-795): item protected for loss only.
+          </div>
+        ` : ""}
+      </div>
+    </div>
+  `;
+
+  document.querySelectorAll("#speedChoices .choiceBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.deliverySpeed = btn.dataset.value || "balanced";
+      const validIds = new Set(availableServices().map(s => s.id));
+      if(!validIds.has(state.selectedServiceId)){
+        state.selectedServiceId = "";
+      }
+      render();
+    });
+  });
+
+  document.querySelectorAll("#serviceChoices .choiceBtn[data-service-id]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.selectedServiceId = btn.dataset.serviceId || "";
+      document.querySelectorAll("#serviceChoices .choiceBtn[data-service-id]").forEach(b=>b.classList.toggle("active", b===btn));
+    });
+  });
+
+  const rp = document.getElementById("recipientPostcodeInput");
+  const ra = document.getElementById("recipientAddressInput");
+  const sp = document.getElementById("senderPostcodeInput");
+  const sa = document.getElementById("senderAddressInput");
+  const pod = document.getElementById("proofDeliveryInput");
+
+  rp.addEventListener("input", (e)=>{
+    const prevNI = isBTPostcode(state.recipientPostcode);
+    state.recipientPostcode = (e.target.value || "").toUpperCase().slice(0, 10);
+    e.target.value = state.recipientPostcode;
+    const nowNI = isBTPostcode(state.recipientPostcode);
+    if(prevNI !== nowNI){
+      if(!nowNI){
+        state.niCustomsReference = "";
+        state.niCustomsConfirmed = false;
+      }
+      render();
+    }
+  });
+  ra.addEventListener("input", (e)=>{ state.recipientAddress = (e.target.value || "").slice(0, 80); e.target.value = state.recipientAddress; });
+  sp.addEventListener("input", (e)=>{ state.senderPostcode = (e.target.value || "").toUpperCase().slice(0, 10); e.target.value = state.senderPostcode; });
+  sa.addEventListener("input", (e)=>{ state.senderAddress = (e.target.value || "").slice(0, 80); e.target.value = state.senderAddress; });
+  pod.addEventListener("change", (e)=>{ state.proofOfDelivery = !!e.target.checked; });
+
+  const niRef = document.getElementById("niReferenceInput");
+  const niConfirm = document.getElementById("niConfirmed");
+  if(niRef){
+    niRef.addEventListener("input", (e)=>{ state.niCustomsReference = (e.target.value || "").slice(0, 40); e.target.value = state.niCustomsReference; });
+  }
+  if(niConfirm){
+    niConfirm.addEventListener("change", (e)=>{ state.niCustomsConfirmed = !!e.target.checked; });
+  }
+}
+
+function renderBasketAndPay(){
+  const service = selectedService();
+  const total = basketTotal();
+
+  screen.innerHTML = `
+    <div class="stepHeader">
+      <div>
+        <h1>Add to Basket and Pay (KIOSK-417)</h1>
+        <p class="subtitle">Review basket, then take payment and finalise transaction.</p>
+      </div>
+      <span class="pill"><span class="material-symbols-outlined">shopping_cart</span> Basket and pay</span>
+    </div>
+
+    <div class="formRow">
+      <div class="card">
+        <h3>Review basket (KIOSK-419)</h3>
+        ${service ? `
+          <div class="helpNote">
+            <strong>Service:</strong> ${escapeHtml(service.name)}<br/>
+            <strong>Base price:</strong> £${calculateServicePrice(service).toFixed(2)}<br/>
+            <strong>Proof of delivery:</strong> ${state.proofOfDelivery ? "Yes (£1.50)" : "No"}<br/>
+            <strong>Total:</strong> £${total.toFixed(2)}
+          </div>
+        ` : `
+          <div class="banner danger show" style="display:block;">No service selected.</div>
+        `}
+      </div>
+      <div class="card">
+        <h3>Take payment (KIOSK-420)</h3>
+        <div class="choiceRow3" id="paymentChoices">
+          <button type="button" class="choiceBtn ${state.paymentMethod==="card"?"active":""}" data-value="card"><span>Card</span></button>
+          <button type="button" class="choiceBtn ${state.paymentMethod==="applepay"?"active":""}" data-value="applepay"><span>Apple Pay</span></button>
+          <button type="button" class="choiceBtn ${state.paymentMethod==="googlepay"?"active":""}" data-value="googlepay"><span>Google Pay</span></button>
+        </div>
+        <button class="btn primary" id="capturePaymentBtn" style="margin-top:12px;">
+          <span class="material-symbols-outlined">payments</span> Take payment and finalise
+        </button>
+        ${state.paymentComplete ? `
+          <div class="banner ok show" style="display:block; margin-top:10px;">Payment captured successfully.</div>
+        ` : ""}
+      </div>
+    </div>
+  `;
+
+  document.querySelectorAll("#paymentChoices .choiceBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.paymentMethod = btn.dataset.value || "";
+      document.querySelectorAll("#paymentChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
+    });
+  });
+
+  document.getElementById("capturePaymentBtn").addEventListener("click", ()=>{
+    if(!state.paymentMethod){
+      alert("Select a payment method first.");
+      return;
+    }
+    state.paymentComplete = true;
+    if(!state.transactionRef){
+      state.transactionRef = `TX-${Math.random().toString(36).slice(2,8).toUpperCase()}`;
+    }
+    render();
+  });
+}
+
+function renderPrintAndConfirm(){
+  const service = selectedService();
+  const total = basketTotal();
+  const dest = state.destination === "uk" ? "UK Inland" : "International";
+
+  screen.innerHTML = `
+    <div class="stepHeader">
+      <div>
+        <h1>Print and Confirm (KIOSK-421)</h1>
+        <p class="subtitle">Print label(s) and show transaction summary/confirmation.</p>
+      </div>
+      <span class="pill"><span class="material-symbols-outlined">print</span> Print and confirm</span>
+    </div>
+
+    <div class="formRow">
+      <div class="card">
+        <h3>Print postage label(s) (KIOSK-422)</h3>
+        <button class="btn primary" id="printLabelsBtn">
+          <span class="material-symbols-outlined">print</span> Print label now
+        </button>
+        ${state.labelsPrinted ? `
+          <div class="banner ok show" style="display:block; margin-top:10px;">Labels printed successfully.</div>
+        ` : ""}
+      </div>
+      <div class="card">
+        <h3>Transaction summary / confirmation CoP (KIOSK-423)</h3>
+        <div class="helpNote">
+          <strong>Reference:</strong> ${escapeHtml(state.transactionRef || "Pending")}<br/>
+          <strong>Service:</strong> ${escapeHtml(service ? service.name : "Not selected")}<br/>
+          <strong>Destination:</strong> ${dest}<br/>
+          <strong>Total paid:</strong> £${total.toFixed(2)}<br/>
+          <strong>Recipient postcode:</strong> ${escapeHtml(state.recipientPostcode || "—")}
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("printLabelsBtn").addEventListener("click", ()=>{
+    state.labelsPrinted = true;
+    if(!state.transactionRef){
+      state.transactionRef = `TX-${Math.random().toString(36).slice(2,8).toUpperCase()}`;
+    }
+    render();
+  });
+}
+
 function renderSummary(){
   const dest = state.destination === "uk" ? "UK" : (state.destination === "intl" ? "International" : "Not set");
   const fmt = ({letter:"Letter", large_letter:"Large letter", parcel:"Parcel"})[state.format] || "Not set";
@@ -1060,10 +1503,35 @@ function canContinue(){
     return state.prohibitedOtherSelected && !state.prohibitedKey;
   }
 
+  if(state.step === 4){
+    return !!state.format && !!state.formatConfirmed;
+  }
+
+  if(state.step === 5){
+    return numericValue(state.declaredValue) > 0 && (state.contentDescription || "").trim().length >= 3;
+  }
+
+  if(state.step === 6){
+    const hasAddresses = !!state.recipientPostcode && !!state.recipientAddress && !!state.senderPostcode && !!state.senderAddress;
+    const hasService = !!state.selectedServiceId;
+    const needsNI = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
+    const niOk = !needsNI || (!!state.niCustomsReference && state.niCustomsConfirmed);
+    return hasAddresses && hasService && niOk;
+  }
+
+  if(state.step === 7){
+    return !!state.paymentComplete;
+  }
+
   return true;
 }
 
 function next(){
+  if(state.step === 8){
+    resetAll();
+    return;
+  }
+
   if(!canContinue()){
     if(state.step === 2){
       if(state.productProfile === "royal_mail"){
@@ -1081,9 +1549,30 @@ function next(){
       alert("Please select 'Other / not listed' to confirm your item is not shown.");
       return;
     }
+    if(state.step === 4){
+      alert("Confirm the format classification before continuing.");
+      return;
+    }
+    if(state.step === 5){
+      alert("Declare item value and provide a contents description.");
+      return;
+    }
+    if(state.step === 6){
+      alert("Complete address details, NI checks (if applicable), and select a service.");
+      return;
+    }
+    if(state.step === 7){
+      alert("Take payment to finalise the transaction before continuing.");
+      return;
+    }
     alert("Please complete this step before continuing.");
     return;
   }
+
+  if(state.step === 6){
+    state.basketAdded = true;
+  }
+
   if(state.step < stepCount()) state.step += 1;
   render();
 }
@@ -1108,6 +1597,23 @@ function resetAll(){
   state.restrictedKeys = new Set();
   state.coverLossOnlyKeys = new Set();
   state.coverNoCompKeys = new Set();
+  state.formatConfirmed = false;
+  state.declaredValue = "";
+  state.contentDescription = "";
+  state.deliverySpeed = "balanced";
+  state.recipientPostcode = "";
+  state.recipientAddress = "";
+  state.senderPostcode = "";
+  state.senderAddress = "";
+  state.niCustomsConfirmed = false;
+  state.niCustomsReference = "";
+  state.proofOfDelivery = false;
+  state.selectedServiceId = "";
+  state.basketAdded = false;
+  state.paymentMethod = "";
+  state.paymentComplete = false;
+  state.labelsPrinted = false;
+  state.transactionRef = "";
   render();
 }
 
