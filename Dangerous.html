@@ -229,7 +229,7 @@
 
     <div class="bottombar">
       <button class="btn danger" id="cancelBtn"><span class="material-symbols-outlined">close</span>Cancel</button>
-      <div class="progress" id="progress">Step 1 of 8</div>
+      <div class="progress" id="progress">Step 1 of 7</div>
       <button class="btn primary" id="nextBtn">Continue <span class="material-symbols-outlined">arrow_forward</span></button>
     </div>
   </div>
@@ -624,7 +624,7 @@ const resetBtn = document.getElementById("resetBtn");
 const cancelBtn = document.getElementById("cancelBtn");
 const helpBtn = document.getElementById("helpBtn");
 
-function stepCount(){ return 8; }
+function stepCount(){ return 7; }
 
 function updateProgress(){
   progress.textContent = `Step ${state.step} of ${stepCount()}`;
@@ -638,20 +638,19 @@ function render(){
 
   if(state.step === 1) renderWeigh();
   else if(state.step === 2) renderRMDangerous();
-  else if(state.step === 3) renderRMConditions();
-  else if(state.step === 4) renderCaptureItemDetails();
-  else if(state.step === 5) renderDeclareValueAndContent();
-  else if(state.step === 6) renderFilterAndPresentOptions();
-  else if(state.step === 7) renderBasketAndPay();
+  else if(state.step === 3) renderCaptureItemDetails();
+  else if(state.step === 4) renderDeclareValueAndContent();
+  else if(state.step === 5) renderFilterAndPresentOptions();
+  else if(state.step === 6) renderBasketAndPay();
   else renderPrintAndConfirm();
 
-  if(state.step === 8){
+  if(state.step === 7){
     nextBtn.innerHTML = `Start new transaction <span class="material-symbols-outlined">restart_alt</span>`;
-  } else if(state.step === 7){
-    nextBtn.innerHTML = `Proceed to print <span class="material-symbols-outlined">arrow_forward</span>`;
   } else if(state.step === 6){
-    nextBtn.innerHTML = `Add to basket <span class="material-symbols-outlined">add_shopping_cart</span>`;
+    nextBtn.innerHTML = `Proceed to print <span class="material-symbols-outlined">arrow_forward</span>`;
   } else if(state.step === 5){
+    nextBtn.innerHTML = `Add to basket <span class="material-symbols-outlined">add_shopping_cart</span>`;
+  } else if(state.step === 4){
     nextBtn.innerHTML = `Filter services <span class="material-symbols-outlined">filter_list</span>`;
   } else {
     nextBtn.innerHTML = `Continue <span class="material-symbols-outlined">arrow_forward</span>`;
@@ -1628,15 +1627,15 @@ function canContinue(){
     return (state.rmOtherSelected || !!state.rmSelectedKey) && !state.rmBlockedKey;
   }
 
-  if(state.step === 4){
+  if(state.step === 3){
     return !!state.format && !!state.formatConfirmed;
   }
 
-  if(state.step === 5){
+  if(state.step === 4){
     return numericValue(state.declaredValue) > 0 && (state.contentDescription || "").trim().length >= 3;
   }
 
-  if(state.step === 6){
+  if(state.step === 5){
     const hasAddresses = !!state.recipientPostcode && !!state.recipientAddress && !!state.senderPostcode && !!state.senderAddress;
     const hasService = !!state.selectedServiceId;
     const needsNI = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
@@ -1645,7 +1644,7 @@ function canContinue(){
     return hasAddresses && hasService && niOk && evriOk;
   }
 
-  if(state.step === 7){
+  if(state.step === 6){
     return !!state.paymentComplete;
   }
 
@@ -1653,7 +1652,7 @@ function canContinue(){
 }
 
 function next(){
-  if(state.step === 8){
+  if(state.step === 7){
     resetAll();
     return;
   }
@@ -1667,15 +1666,15 @@ function next(){
       alert("Please select a Royal Mail category or choose 'Other / not listed'.");
       return;
     }
-    if(state.step === 4){
+    if(state.step === 3){
       alert("Confirm the format classification before continuing.");
       return;
     }
-    if(state.step === 5){
+    if(state.step === 4){
       alert("Declare item value and provide a contents description.");
       return;
     }
-    if(state.step === 6){
+    if(state.step === 5){
       if(state.productProfile === "evri_dpd" && state.evriAdditionalBlocked){
         alert("EVRi/DPD prohibited item selected. Choose a different service or clear the screening result.");
         return;
@@ -1683,7 +1682,7 @@ function next(){
       alert("Complete address details, NI/Windsor checks (if applicable), select a service, and finish carrier-specific screening.");
       return;
     }
-    if(state.step === 7){
+    if(state.step === 6){
       alert("Take payment to finalise the transaction before continuing.");
       return;
     }
@@ -1691,7 +1690,7 @@ function next(){
     return;
   }
 
-  if(state.step === 6){
+  if(state.step === 5){
     state.basketAdded = true;
   }
 
