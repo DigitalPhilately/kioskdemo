@@ -1917,8 +1917,6 @@ function renderPolicyChecks(){
 function renderCaptureItemDetails(){
   const fmt = ({letter:"Letter", large_letter:"Large letter", parcel:"Parcel"})[state.format] || "Not set";
   const dest = state.destination === "uk" ? "UK Inland" : "International";
-  const service = selectedService();
-  const profile = service ? (service.profile === "royal_mail" ? "Royal Mail" : "EVRi / DPD") : "Not selected yet";
   const isDomestic = isDomesticJourney();
   const speedOptions = domesticDeliveryPreferences();
   const speedSection = isDomestic ? `
@@ -1937,49 +1935,37 @@ function renderCaptureItemDetails(){
         </div>
   ` : `
         <h3 style="margin-top:14px;">Delivery speed preference (KIOSK-427)</h3>
-        <div class="tag"><span class="material-symbols-outlined">public</span>Skipped for International</div>
+        <div class="banner ok show" style="display:block;">International item: this step is skipped.</div>
   `;
 
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
         <h1>Item Offered to “Format Sidecar”</h1>
-        <p class="subtitle">Confirm Format Classification (KIOSK-405).</p>
+        <p class="subtitle">Confirm format, declare value, then choose delivery speed.</p>
       </div>
       <span class="pill"><span class="material-symbols-outlined">inventory_2</span> Format sidecar</span>
     </div>
 
-    <div class="flowShell">
-      <div class="flowMain">
-        <div class="card">
-          <h3>Item offered to format sidecar</h3>
-          <div style="margin-top:10px;">
-            <span class="tag"><span class="material-symbols-outlined">scale</span> ${escapeHtml(state.weightG || "—")} g</span>
-            <span class="tag"><span class="material-symbols-outlined">straighten</span> ${fmt}</span>
-            <span class="tag"><span class="material-symbols-outlined">public</span> ${dest}</span>
-            <span class="tag"><span class="material-symbols-outlined">local_shipping</span> ${profile}</span>
-          </div>
-
-          <h3 style="margin-top:14px;">Confirm format classification (KIOSK-405)</h3>
-          <div class="choiceRow3" id="captureFormatChoices">
-            <button type="button" class="choiceBtn ${state.format==="letter"?"active":""}" data-value="letter"><span>Letter</span></button>
-            <button type="button" class="choiceBtn ${state.format==="large_letter"?"active":""}" data-value="large_letter"><span>Large Letter</span></button>
-            <button type="button" class="choiceBtn ${state.format==="parcel"?"active":""}" data-value="parcel"><span>Parcel</span></button>
-          </div>
-
-          <h3 style="margin-top:14px;">Declare item value (KIOSK-407)</h3>
-          <input id="declaredValueInput" inputmode="decimal" placeholder="e.g. 49.99" value="${escapeHtml(state.declaredValue)}" />
-
-          ${speedSection}
-        </div>
+    <div class="card">
+      <h3>Item details</h3>
+      <div style="margin-top:10px;">
+        <span class="tag"><span class="material-symbols-outlined">scale</span> ${escapeHtml(state.weightG || "—")} g</span>
+        <span class="tag"><span class="material-symbols-outlined">public</span> ${dest}</span>
+        <span class="tag"><span class="material-symbols-outlined">straighten</span> ${fmt}</span>
       </div>
-      <aside class="flowAside">
-        <div class="flowNarrative">
-          <h4>Journey Note</h4>
-          <p>Format sidecar confirms the final size classification before service filtering.</p>
-          <p>${isDomestic ? "Delivery preference prices are indicative minimums (reference data)." : "International journeys skip delivery preference and continue to service filtering."}</p>
-        </div>
-      </aside>
+
+      <h3 style="margin-top:14px;">Confirm format classification (KIOSK-405)</h3>
+      <div class="choiceRow3" id="captureFormatChoices">
+        <button type="button" class="choiceBtn ${state.format==="letter"?"active":""}" data-value="letter"><span>Letter</span></button>
+        <button type="button" class="choiceBtn ${state.format==="large_letter"?"active":""}" data-value="large_letter"><span>Large Letter</span></button>
+        <button type="button" class="choiceBtn ${state.format==="parcel"?"active":""}" data-value="parcel"><span>Parcel</span></button>
+      </div>
+
+      <h3 style="margin-top:14px;">Declare item value (KIOSK-407)</h3>
+      <input id="declaredValueInput" inputmode="decimal" placeholder="e.g. 49.99" value="${escapeHtml(state.declaredValue)}" />
+
+      ${speedSection}
     </div>
   `;
 
