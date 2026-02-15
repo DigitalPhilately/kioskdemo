@@ -720,7 +720,7 @@ function renderWeigh(){
       </div>
       <div class="card">
         <h3>Journey setup</h3>
-        <p>Set destination and format classification.</p>
+        <p>Set destination. Format is confirmed after dangerous goods screening.</p>
         <div class="choiceGroup">
           <div class="choiceRow" id="destChoices">
             <button type="button" class="choiceBtn ${state.destination==="uk"?"active":""}" data-value="uk">
@@ -733,19 +733,7 @@ function renderWeigh(){
             </button>
           </div>
         </div>
-        <p style="margin:10px 0 8px;color:var(--muted);font-size:13px;">What size is your item?</p>
-        <div class="choiceRow3" id="formatChoices">
-          <button type="button" class="choiceBtn ${state.format==="letter"?"active":""}" data-value="letter">
-            <span>Letter</span>
-          </button>
-          <button type="button" class="choiceBtn ${state.format==="large_letter"?"active":""}" data-value="large_letter">
-            <span>Large Letter</span>
-          </button>
-          <button type="button" class="choiceBtn ${state.format==="parcel"?"active":""}" data-value="parcel">
-            <span>Parcel</span>
-          </button>
-        </div>
-        <div class="helpNote">All customers go through Royal Mail dangerous goods screening first. Carrier-specific checks happen later after product selection.</div>
+        <div class="helpNote">All customers go through Royal Mail dangerous goods screening next. Sidecar format check happens immediately after that.</div>
         <div class="demoToggleRow">
           <label class="demoToggle">
             <span>Demo fast-track</span>
@@ -786,20 +774,6 @@ function renderWeigh(){
       state.evriNoCompSelected = false;
       document.querySelectorAll("#destChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
       setDestinationPill();
-    });
-  });
-  document.querySelectorAll("#formatChoices .choiceBtn").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      state.format = btn.dataset.value || "";
-      state.formatConfirmed = false;
-      state.selectedServiceId = "";
-      state.productProfile = "royal_mail";
-      state.evriAdditionalSelection = "";
-      state.evriAdditionalBlocked = false;
-      state.evriScreeningComplete = false;
-      state.evriLossOnlySelected = false;
-      state.evriNoCompSelected = false;
-      document.querySelectorAll("#formatChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
     });
   });
   document.getElementById("quickDemoToggle").addEventListener("change", (e)=>{
@@ -1668,7 +1642,7 @@ function wireMultiSelectDetails(mode, list, setRef, detailsMode="r"){
    Navigation rules
 ---------------------------- */
 function canContinue(){
-  if(state.step === 1) return !!state.weightG && !!state.destination && !!state.format;
+  if(state.step === 1) return !!state.weightG && !!state.destination;
 
   if(state.step === 2){
     return (state.rmOtherSelected || !!state.rmSelectedKey) && !state.rmBlockedKey;
