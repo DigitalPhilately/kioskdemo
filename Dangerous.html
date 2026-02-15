@@ -705,22 +705,23 @@ function renderWeigh(){
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Launch Postage Journey (KIOSK-401)</h1>
-        <p class="subtitle">Capture item-on-scales details and journey context before dangerous goods screening.</p>
+        <h1>Item On Scales</h1>
+        <p class="subtitle">Customer selects Post an Item, then capture weight before dangerous goods screening.</p>
       </div>
       <span class="pill"><span class="material-symbols-outlined">scale</span> Item On Scales (KIOSK-404)</span>
     </div>
 
     <div class="formRow stack">
       <div class="card">
-        <h3>Capture weight (KIOSK-404)</h3>
-        <p>In production this is captured automatically from scales.</p>
-        <input id="weightInput" inputmode="numeric" placeholder="e.g. 350" value="${escapeHtml(state.weightG)}" />
-        <div class="helpNote">Next: screen for prohibited or restricted items (KIOSK-409).</div>
+        <h3>Customer selects “Post an Item” (KIOSK-402)</h3>
+        <p>Journey is launched for item posting.</p>
+        <div class="helpNote">Flow intent: fail fast on dangerous goods before format sidecar confirmation.</div>
       </div>
       <div class="card">
-        <h3>Journey setup</h3>
-        <p>Set destination. Format is confirmed after dangerous goods screening.</p>
+        <h3>Capture weight (KIOSK-404)</h3>
+        <p>In production this is captured automatically from scales. Kiosk supports up to max system weight.</p>
+        <input id="weightInput" inputmode="numeric" placeholder="e.g. 350" value="${escapeHtml(state.weightG)}" />
+        <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Destination</p>
         <div class="choiceGroup">
           <div class="choiceRow" id="destChoices">
             <button type="button" class="choiceBtn ${state.destination==="uk"?"active":""}" data-value="uk">
@@ -733,7 +734,7 @@ function renderWeigh(){
             </button>
           </div>
         </div>
-        <div class="helpNote">All customers go through Royal Mail dangerous goods screening next. Sidecar format check happens immediately after that.</div>
+        <div class="helpNote">Next: Screen for Dangerous Goods, including Prohibited or Restricted Items (KIOSK-410).</div>
         <div class="demoToggleRow">
           <label class="demoToggle">
             <span>Demo fast-track</span>
@@ -851,10 +852,10 @@ function renderRMDangerous(){
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Screen for prohibited or restricted items (KIOSK-409)</h1>
-        <p class="subtitle"><strong>Royal Mail dangerous goods filter.</strong> Rules shown are based on destination (${isUK ? "UK" : "International"}).</p>
+        <h1>Screen for Dangerous Goods (KIOSK-410)</h1>
+        <p class="subtitle"><strong>Including Prohibited or Restricted items.</strong> Rules shown for ${isUK ? "UK" : "International"} destination.</p>
       </div>
-      <span class="pill"><span class="material-symbols-outlined">local_shipping</span> RM filter (KIOSK-410)</span>
+      <span class="pill"><span class="material-symbols-outlined">local_shipping</span> Dangerous goods screen</span>
     </div>
 
     <div class="gridWrap">
@@ -1066,10 +1067,10 @@ function renderCaptureItemDetails(){
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Capture Item Details (KIOSK-403)</h1>
-        <p class="subtitle">Confirm format classification from sidecar and lock item details before value declaration.</p>
+        <h1>Item Offered to “Format Sidecar”</h1>
+        <p class="subtitle">Confirm Format Classification (KIOSK-405).</p>
       </div>
-      <span class="pill"><span class="material-symbols-outlined">inventory_2</span> Item details</span>
+      <span class="pill"><span class="material-symbols-outlined">inventory_2</span> Format sidecar</span>
     </div>
 
     <div class="formRow">
@@ -1081,7 +1082,7 @@ function renderCaptureItemDetails(){
           <span class="tag"><span class="material-symbols-outlined">public</span> ${dest}</span>
           <span class="tag"><span class="material-symbols-outlined">local_shipping</span> ${profile}</span>
         </div>
-        <div class="helpNote">KIOSK-405 Confirm format classification before continuing.</div>
+        <div class="helpNote">Kiosk will use format sidecar for classification confirmation.</div>
       </div>
       <div class="card">
         <h3>Confirm format classification</h3>
