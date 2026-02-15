@@ -857,9 +857,15 @@ function renderRMDangerous(){
     details:"Select this if your item does not match any listed category."
   };
   const rmOrdered = [...RM_FILTER];
-  // Put "Other / not listed" on the right side (end of first row in 5-column grid).
-  rmOrdered.splice(4, 0, otherItem);
-  const list = padTo25(rmOrdered);
+  // Keep "Other / not listed" fixed at bottom-right (row 5, col 5) for fast-path selection.
+  if(rmOrdered.length > 24){
+    rmOrdered.length = 24;
+  }
+  while(rmOrdered.length < 24){
+    rmOrdered.push({ key:`_rm_gap_${rmOrdered.length}`, label:"", icon:"block", details:"", blank:true });
+  }
+  rmOrdered.push(otherItem);
+  const list = rmOrdered;
   const isUK = state.destination === "uk";
 
   screen.innerHTML = `
