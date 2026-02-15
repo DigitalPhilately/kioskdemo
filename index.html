@@ -322,7 +322,9 @@ const state = {
   rmConditionChecks: {},
   rmConditionValues: {},
   rmConditionSatisfied: false,
+  evriScreeningOpen: false,
   evriAdditionalSelection: "",
+  evriSelectedProhibitedKey: null,
   evriAdditionalBlocked: false,
   evriScreeningComplete: false,
   evriLossOnlySelected: false,
@@ -1254,7 +1256,9 @@ function applyQuickDemoDefaults(){
     state.productProfile = selected.profile;
   }
   if(selected && selected.profile === "evri_dpd"){
+    state.evriScreeningOpen = false;
     state.evriAdditionalSelection = "clear";
+    state.evriSelectedProhibitedKey = null;
     state.evriAdditionalBlocked = false;
     state.evriScreeningComplete = true;
   }
@@ -1296,8 +1300,8 @@ function render(){
   else if(state.step === 5) renderBasketAndPay();
   else renderPrintAndConfirm();
 
-  // On RM dangerous goods screen selection is single-tap and auto-advances.
-  if(state.step === 2){
+  // Hide primary footer action on in-screen tap flows.
+  if(state.step === 2 || (state.step === 4 && state.evriScreeningOpen)){
     nextBtn.style.visibility = "hidden";
     nextBtn.style.pointerEvents = "none";
   } else {
@@ -1395,7 +1399,9 @@ function renderWeigh(){
       } else {
         state.deliverySpeed = "";
       }
+      state.evriScreeningOpen = false;
       state.evriAdditionalSelection = "";
+      state.evriSelectedProhibitedKey = null;
       state.evriAdditionalBlocked = false;
       state.evriScreeningComplete = false;
       state.evriLossOnlySelected = false;
@@ -1986,6 +1992,206 @@ function renderCaptureItemDetails(){
   });
 }
 
+function renderEvriAdditionalScreening(){
+  const prohibitedList = padTo25([
+    ...PROHIBITED,
+    {
+      key:"evri_other_not_listed",
+      label:"Other / not listed",
+      icon:"check_circle",
+      details:"Select this if your item does not match any prohibited category."
+    }
+  ]);
+  const lossList = padTo25(LOSS_ONLY);
+  const noCompList = padTo25(NO_COMP);
+  const prohibitedLabel = state.evriSelectedProhibitedKey
+    ? (PROHIBITED.find(x => x.key === state.evriSelectedProhibitedKey)?.label || state.evriSelectedProhibitedKey)
+    : "Other / not listed";
+
+  screen.innerHTML = `
+    <div class="stepHeader">
+      <div>
+        <h1>EVRi/DPD additional screening</h1>
+        <p class="subtitle">Complete carrier-specific prohibited and compensation checks before basket.</p>
+      </div>
+      <span class="pill"><span class="material-symbols-outlined">policy</span> Additional carrier checks</span>
+    </div>
+
+    <div class="card" style="margin-bottom:14px;">
+      <h3>Prohibited categories (EVRi/DPD)</h3>
+      <p>Select the matching prohibited category, or choose Other / not listed.</p>
+      <div class="gridWrap">
+        <div class="grid" id="evriProhibitedGrid"></div>
+        <div class="details" id="evriProhibitedDetails">
+          <div class="detailsTop">
+            <div class="detailsTitle" id="evriProhibitedDetailsTitle"></div>
+            <button class="btn" id="evriProhibitedClose"><span class="material-symbols-outlined">close</span>Close</button>
+          </div>
+          <div class="detailsText" id="evriProhibitedDetailsText"></div>
+          <div class="banner" id="evriProhibitedBanner"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="formRow">
+      <div class="card">
+        <h3>Loss-only compensation categories</h3>
+        <p>Select any categories that apply.</p>
+        <div class="gridWrap">
+          <div class="grid" id="evriLossGrid"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>No-compensation categories</h3>
+        <p>Select any categories that apply.</p>
+        <div class="gridWrap">
+          <div class="grid" id="evriNoCompGrid"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="details" id="evriCompDetails">
+      <div class="detailsTop">
+        <div class="detailsTitle" id="evriCompDetailsTitle"></div>
+        <button class="btn" id="evriCompClose"><span class="material-symbols-outlined">close</span>Close</button>
+      </div>
+      <div class="detailsText" id="evriCompDetailsText"></div>
+      <div class="banner warn show" style="display:block; margin-top:10px;">
+        This affects compensation eligibility on EVRi/DPD services.
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px;">
+      <div class="helpNote">
+        <strong>Current prohibited outcome:</strong> ${escapeHtml(state.evriAdditionalSelection === "blocked" ? `Prohibited (${prohibitedLabel})` : "Other / not listed")}<br/>
+        <strong>Loss-only selected:</strong> ${state.coverLossOnlyKeys.size ? "Yes" : "No"}<br/>
+        <strong>No-compensation selected:</strong> ${state.coverNoCompKeys.size ? "Yes" : "No"}
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+        <button class="btn" id="evriScreeningBack"><span class="material-symbols-outlined">arrow_back</span>Back to services</button>
+        <button class="btn primary" id="evriScreeningConfirm"><span class="material-symbols-outlined">task_alt</span>Confirm EVRi/DPD screening</button>
+      </div>
+      ${state.evriAdditionalSelection === "blocked" ? `
+        <div class="banner danger show" style="display:block; margin-top:10px;">EVRi/DPD prohibited item selected. Choose a different service or change selection.</div>
+      ` : state.evriAdditionalSelection === "clear" ? `
+        <div class="banner ok show" style="display:block; margin-top:10px;">EVRi/DPD additional screening currently clear.</div>
+      ` : `
+        <div class="banner warn show" style="display:block; margin-top:10px;">Select a prohibited outcome to complete screening.</div>
+      `}
+    </div>
+  `;
+
+  const prohibitedGrid = document.getElementById("evriProhibitedGrid");
+  prohibitedList.forEach(item => prohibitedGrid.appendChild(tileEl(item, "evriProhibited")));
+
+  if(state.evriAdditionalSelection === "clear"){
+    const otherTile = prohibitedGrid.querySelector('.tile[data-key="evri_other_not_listed"]');
+    if(otherTile) otherTile.classList.add("selected");
+  } else if(state.evriSelectedProhibitedKey){
+    const selectedTile = prohibitedGrid.querySelector(`.tile[data-key="${state.evriSelectedProhibitedKey}"]`);
+    if(selectedTile) selectedTile.classList.add("selected");
+  }
+
+  const pDetails = document.getElementById("evriProhibitedDetails");
+  const pTitle = document.getElementById("evriProhibitedDetailsTitle");
+  const pText = document.getElementById("evriProhibitedDetailsText");
+  const pBanner = document.getElementById("evriProhibitedBanner");
+  const pClose = document.getElementById("evriProhibitedClose");
+
+  document.querySelectorAll('.tile[data-mode="evriProhibited"]').forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const key = btn.dataset.key;
+      const item = prohibitedList.find(x=>x.key===key);
+      if(!item) return;
+
+      document.querySelectorAll('.tile[data-mode="evriProhibited"]').forEach(b=>b.classList.remove("selected"));
+      btn.classList.add("selected");
+
+      pTitle.innerHTML = `
+        <div class="icon"><span class="material-symbols-outlined">${item.icon || "block"}</span></div>
+        ${escapeHtml(item.label)}
+      `;
+      pText.textContent = item.details || "";
+      pBanner.className = "banner show";
+
+      if(key === "evri_other_not_listed"){
+        state.evriAdditionalSelection = "clear";
+        state.evriSelectedProhibitedKey = null;
+        state.evriAdditionalBlocked = false;
+        pBanner.classList.add("ok");
+        pBanner.textContent = "No EVRi/DPD prohibited category selected.";
+      } else {
+        state.evriAdditionalSelection = "blocked";
+        state.evriSelectedProhibitedKey = key;
+        state.evriAdditionalBlocked = true;
+        pBanner.classList.add("danger");
+        pBanner.textContent = "This is treated as prohibited for EVRi/DPD screening.";
+      }
+      state.evriScreeningComplete = false;
+      pDetails.classList.add("show");
+    });
+  });
+
+  pClose.addEventListener("click", ()=>{
+    pDetails.classList.remove("show");
+  });
+
+  const lossGrid = document.getElementById("evriLossGrid");
+  lossList.forEach(item => lossGrid.appendChild(tileEl(item, "evriLoss", true)));
+  wireMultiSelectDetails("evriLoss", lossList, state.coverLossOnlyKeys, "evriComp");
+
+  const noCompGrid = document.getElementById("evriNoCompGrid");
+  noCompList.forEach(item => noCompGrid.appendChild(tileEl(item, "evriNc", true)));
+  wireMultiSelectDetails("evriNc", noCompList, state.coverNoCompKeys, "evriComp");
+
+  state.coverLossOnlyKeys.forEach(key=>{
+    const btn = document.querySelector(`.tile[data-mode="evriLoss"][data-key="${key}"]`);
+    if(btn) btn.classList.add("selected");
+  });
+  state.coverNoCompKeys.forEach(key=>{
+    const btn = document.querySelector(`.tile[data-mode="evriNc"][data-key="${key}"]`);
+    if(btn) btn.classList.add("selected");
+  });
+
+  document.querySelectorAll('.tile[data-mode="evriLoss"], .tile[data-mode="evriNc"]').forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.evriLossOnlySelected = state.coverLossOnlyKeys.size > 0;
+      state.evriNoCompSelected = state.coverNoCompKeys.size > 0;
+      state.evriScreeningComplete = false;
+    });
+  });
+
+  document.getElementById("evriCompClose").addEventListener("click", ()=>{
+    document.getElementById("evriCompDetails").classList.remove("show");
+    document.querySelectorAll('.tile[data-mode="evriLoss"], .tile[data-mode="evriNc"]').forEach(b=>b.classList.remove("selected"));
+    state.coverLossOnlyKeys.forEach(key=>{
+      const btn = document.querySelector(`.tile[data-mode="evriLoss"][data-key="${key}"]`);
+      if(btn) btn.classList.add("selected");
+    });
+    state.coverNoCompKeys.forEach(key=>{
+      const btn = document.querySelector(`.tile[data-mode="evriNc"][data-key="${key}"]`);
+      if(btn) btn.classList.add("selected");
+    });
+  });
+
+  document.getElementById("evriScreeningBack").addEventListener("click", ()=>{
+    state.evriScreeningOpen = false;
+    render();
+  });
+
+  document.getElementById("evriScreeningConfirm").addEventListener("click", ()=>{
+    if(!state.evriAdditionalSelection){
+      alert("Select the EVRi/DPD prohibited outcome before confirming screening.");
+      return;
+    }
+    state.evriLossOnlySelected = state.coverLossOnlyKeys.size > 0;
+    state.evriNoCompSelected = state.coverNoCompKeys.size > 0;
+    state.evriScreeningComplete = true;
+    state.evriScreeningOpen = false;
+    render();
+  });
+}
+
 function renderFilterAndPresentOptions(){
   const services = availableServices();
   const isDomestic = isDomesticJourney();
@@ -1999,6 +2205,16 @@ function renderFilterAndPresentOptions(){
   const showRMNISpecial = showGBToNI && selectedRMRule && !!selectedRMRule.niRule;
   const chosenService = selectedService();
   const needsEvriAdditional = !!(chosenService && chosenService.profile === "evri_dpd");
+  if(!needsEvriAdditional && state.evriScreeningOpen){
+    state.evriScreeningOpen = false;
+  }
+  if(needsEvriAdditional && state.evriScreeningOpen){
+    renderEvriAdditionalScreening();
+    return;
+  }
+  const evriProhibitedLabel = state.evriSelectedProhibitedKey
+    ? (PROHIBITED.find(x => x.key === state.evriSelectedProhibitedKey)?.label || state.evriSelectedProhibitedKey)
+    : "Other / not listed";
 
   screen.innerHTML = `
     <div class="stepHeader">
@@ -2113,27 +2329,27 @@ function renderFilterAndPresentOptions(){
 
         ${needsEvriAdditional ? `
           <div class="helpNote" style="margin-top:12px;">
-            <strong>EVRi/DPD additional screening required:</strong> complete carrier-specific checks before basket.
+            <strong>EVRi/DPD additional screening required:</strong> open the dedicated screening screens before basket.
           </div>
-          <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Does the item contain an EVRi/DPD prohibited category?</p>
-          <div class="choiceRow" id="evriDangerousChoices">
-            <button type="button" class="choiceBtn ${state.evriAdditionalSelection==="blocked"?"active":""}" data-value="blocked"><span>Yes, prohibited item</span></button>
-            <button type="button" class="choiceBtn ${state.evriAdditionalSelection==="clear"?"active":""}" data-value="clear"><span>No, other/not listed</span></button>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+            <button type="button" class="btn" id="openEvriScreeningBtn">
+              <span class="material-symbols-outlined">fact_check</span>Open EVRi/DPD screening screens
+            </button>
+            <button type="button" class="btn ghost" id="resetEvriScreeningBtn">
+              <span class="material-symbols-outlined">restart_alt</span>Reset screening
+            </button>
           </div>
-          <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-weight:700;">
-            <input type="checkbox" id="evriLossOnlyInput" ${state.evriLossOnlySelected ? "checked" : ""}/>
-            <span>Item is in loss-only compensation category</span>
-          </label>
-          <label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-weight:700;">
-            <input type="checkbox" id="evriNoCompInput" ${state.evriNoCompSelected ? "checked" : ""}/>
-            <span>Item is in no-compensation category</span>
-          </label>
+          <div class="helpNote" style="margin-top:10px;">
+            <strong>Current screening result:</strong> ${state.evriAdditionalSelection === "blocked" ? `Prohibited (${escapeHtml(evriProhibitedLabel)})` : (state.evriAdditionalSelection === "clear" ? "Other / not listed" : "Not completed")}<br/>
+            <strong>Loss-only selected:</strong> ${state.evriLossOnlySelected ? "Yes" : "No"}<br/>
+            <strong>No-compensation selected:</strong> ${state.evriNoCompSelected ? "Yes" : "No"}
+          </div>
           ${state.evriAdditionalSelection==="blocked" ? `
             <div class="banner danger show" style="display:block; margin-top:10px;">EVRi/DPD prohibited item selected. Cannot proceed with this service.</div>
-          ` : state.evriAdditionalSelection==="clear" ? `
+          ` : state.evriScreeningComplete ? `
             <div class="banner ok show" style="display:block; margin-top:10px;">EVRi/DPD additional screening passed.</div>
           ` : `
-            <div class="banner warn show" style="display:block; margin-top:10px;">Select an EVRi/DPD screening outcome to continue.</div>
+            <div class="banner warn show" style="display:block; margin-top:10px;">Complete EVRi/DPD screening screens before continuing.</div>
           `}
         ` : ""}
       </div>
@@ -2146,11 +2362,17 @@ function renderFilterAndPresentOptions(){
       const chosen = selectedService();
       state.productProfile = chosen ? chosen.profile : "royal_mail";
       if(state.productProfile !== "evri_dpd"){
+        state.evriScreeningOpen = false;
         state.evriAdditionalSelection = "";
+        state.evriSelectedProhibitedKey = null;
         state.evriAdditionalBlocked = false;
         state.evriScreeningComplete = false;
         state.evriLossOnlySelected = false;
         state.evriNoCompSelected = false;
+        state.coverLossOnlyKeys = new Set();
+        state.coverNoCompKeys = new Set();
+      } else if(state.productProfile === "evri_dpd"){
+        state.evriScreeningOpen = false;
       }
       render();
     });
@@ -2253,23 +2475,27 @@ function renderFilterAndPresentOptions(){
     });
   }
 
-  const evriChoices = document.querySelectorAll("#evriDangerousChoices .choiceBtn");
-  evriChoices.forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      state.evriAdditionalSelection = btn.dataset.value || "";
-      state.evriAdditionalBlocked = state.evriAdditionalSelection === "blocked";
-      state.evriScreeningComplete = !!state.evriAdditionalSelection;
-      evriChoices.forEach(b=>b.classList.toggle("active", b===btn));
+  const openEvriScreeningBtn = document.getElementById("openEvriScreeningBtn");
+  if(openEvriScreeningBtn){
+    openEvriScreeningBtn.addEventListener("click", ()=>{
+      state.evriScreeningOpen = true;
       render();
     });
-  });
-  const evriLossOnly = document.getElementById("evriLossOnlyInput");
-  const evriNoComp = document.getElementById("evriNoCompInput");
-  if(evriLossOnly){
-    evriLossOnly.addEventListener("change", (e)=>{ state.evriLossOnlySelected = !!e.target.checked; });
   }
-  if(evriNoComp){
-    evriNoComp.addEventListener("change", (e)=>{ state.evriNoCompSelected = !!e.target.checked; });
+  const resetEvriScreeningBtn = document.getElementById("resetEvriScreeningBtn");
+  if(resetEvriScreeningBtn){
+    resetEvriScreeningBtn.addEventListener("click", ()=>{
+      state.evriScreeningOpen = false;
+      state.evriAdditionalSelection = "";
+      state.evriSelectedProhibitedKey = null;
+      state.evriAdditionalBlocked = false;
+      state.evriScreeningComplete = false;
+      state.evriLossOnlySelected = false;
+      state.evriNoCompSelected = false;
+      state.coverLossOnlyKeys = new Set();
+      state.coverNoCompKeys = new Set();
+      render();
+    });
   }
 }
 
@@ -2587,6 +2813,7 @@ function canContinue(){
   }
 
   if(state.step === 4){
+    if(state.evriScreeningOpen) return false;
     const hasAddresses = !!state.recipientPostcode && !!state.recipientAddress && !!state.senderPostcode && !!state.senderAddress;
     const hasService = !!state.selectedServiceId;
     const needsNI = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
@@ -2633,6 +2860,10 @@ function next(){
       return;
     }
     if(state.step === 4){
+      if(state.evriScreeningOpen){
+        alert("Complete or close the EVRi/DPD screening screens before continuing.");
+        return;
+      }
       if(state.productProfile === "evri_dpd" && state.evriAdditionalBlocked){
         alert("EVRi/DPD prohibited item selected. Choose a different service or clear the screening result.");
         return;
@@ -2681,7 +2912,9 @@ function resetAll(){
   state.rmConditionChecks = {};
   state.rmConditionValues = {};
   state.rmConditionSatisfied = false;
+  state.evriScreeningOpen = false;
   state.evriAdditionalSelection = "";
+  state.evriSelectedProhibitedKey = null;
   state.evriAdditionalBlocked = false;
   state.evriScreeningComplete = false;
   state.evriLossOnlySelected = false;
