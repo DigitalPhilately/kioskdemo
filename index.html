@@ -654,6 +654,128 @@ const RM_FILTER = [
     details:"Not allowed UK or International.", checks:[], limits:[] },
 ];
 
+// Grouped RM category tiles for a cleaner first DG screen.
+// Follow-up options are shown after selecting one of these groups.
+const RM_GROUPS = [
+  {
+    key:"rmg_aerosol_perfume",
+    label:"Aerosols / perfume / nail",
+    icon:"air",
+    prompt:"Select the best match for aerosol/perfume/nail products.",
+    ruleKeys:[
+      "rm_aerosols_toiletry_medicinal",
+      "rm_aerosols_other",
+      "rm_perfume_aftershave",
+      "rm_nail_varnish"
+    ]
+  },
+  {
+    key:"rmg_alcohol",
+    label:"Alcohol (all strengths)",
+    icon:"liquor",
+    prompt:"Select the alcohol strength band.",
+    ruleKeys:[
+      "rm_alcohol_up_to_24",
+      "rm_alcohol_24_to_70",
+      "rm_alcohol_over_70"
+    ]
+  },
+  {
+    key:"rmg_batteries_lithium",
+    label:"Batteries / lithium",
+    icon:"battery_alert",
+    prompt:"Select how the batteries are being sent.",
+    ruleKeys:[
+      "rm_device_lithium_connected",
+      "rm_device_lithium_not_connected",
+      "rm_lithium_not_with_device",
+      "rm_batteries_dangerous_used",
+      "rm_new_consumer_batteries",
+      "rm_wet_non_spillable_battery"
+    ]
+  },
+  {
+    key:"rmg_medicines_samples",
+    label:"Medicines / specimens",
+    icon:"medication",
+    prompt:"Select the medicine or specimen type.",
+    ruleKeys:[
+      "rm_prescription_non_toxic",
+      "rm_prescription_toxic_flammable",
+      "rm_patient_specimens",
+      "rm_biological_substance_cat_b",
+      "rm_clinical_medical_waste"
+    ]
+  },
+  {
+    key:"rmg_chemicals_liquids",
+    label:"Chemicals / liquids",
+    icon:"science",
+    prompt:"Select the chemical or liquid category.",
+    ruleKeys:[
+      "rm_liquids_under_1l",
+      "rm_liquids_over_1l",
+      "rm_flammable_liquids",
+      "rm_flammable_solids",
+      "rm_corrosives",
+      "rm_oxidising_peroxides",
+      "rm_environmentally_hazardous",
+      "rm_pesticides",
+      "rm_poisons_toxic",
+      "rm_radioactive_materials",
+      "rm_solvent_paints_varnish"
+    ]
+  },
+  {
+    key:"rmg_gas_explosives",
+    label:"Gases / explosives",
+    icon:"warning",
+    prompt:"Select the gas or explosive type.",
+    ruleKeys:[
+      "rm_gases",
+      "rm_lighters_refills",
+      "rm_explosives",
+      "rm_matches"
+    ]
+  },
+  {
+    key:"rmg_weapons_blades",
+    label:"Weapons / blades / ammo",
+    icon:"gpp_bad",
+    prompt:"Select the weapon or blade type.",
+    ruleKeys:[
+      "rm_weapons",
+      "rm_bladed_items",
+      "rm_sharp_pointed_items",
+      "rm_guns_sporting_use",
+      "rm_ammunition"
+    ]
+  },
+  {
+    key:"rmg_perishable_live",
+    label:"Perishables / live / ashes",
+    icon:"eco",
+    prompt:"Select the perishable or live-content category.",
+    ruleKeys:[
+      "rm_perishables",
+      "rm_live_creatures",
+      "rm_human_animal_ashes"
+    ]
+  },
+  {
+    key:"rmg_controlled_misc",
+    label:"Controlled / waste / misc",
+    icon:"gavel",
+    prompt:"Select the best match for controlled, waste, or special material items.",
+    ruleKeys:[
+      "rm_controlled_drugs",
+      "rm_environmental_waste",
+      "rm_waste_dirt_filth",
+      "rm_magnetised_material"
+    ]
+  }
+];
+
 // COVER LIMITS: Loss-only (refund if lost, not damage)
 const LOSS_ONLY = [
   { key:"antiques", label:"Antiques (100+ yrs)", icon:"museum",
@@ -800,6 +922,19 @@ function rmRuleRequirements(rule){
     limitAnyOf: rule.limitAnyOf || [],
     limitAnyOfLabel: rule.limitAnyOfLabel || ""
   };
+}
+
+function rmRulesForGroup(groupKey){
+  const group = RM_GROUPS.find(x => x.key === groupKey);
+  if(!group) return [];
+  return group.ruleKeys
+    .map(key => RM_FILTER.find(rule => rule.key === key))
+    .filter(Boolean);
+}
+
+function rmGroupForRule(ruleKey){
+  if(!ruleKey) return null;
+  return RM_GROUPS.find(group => group.ruleKeys.includes(ruleKey)) || null;
 }
 
 function resetRMConditionCapture(){
@@ -1209,21 +1344,21 @@ function renderRMDangerous(){
     icon:"check_circle",
     details:"Select this if your item does not match any listed category."
   };
-  const rmOrdered = [...RM_FILTER];
-  // Keep "Other / not listed" fixed at bottom-right of the visible RM category area.
-  const activeSlots = Math.ceil((rmOrdered.length + 1) / 5) * 5;
-  while(rmOrdered.length < activeSlots - 1){
-    rmOrdered.push({ key:`_rm_gap_${rmOrdered.length}`, label:"", icon:"block", details:"", blank:true });
+  const groupTiles = [...RM_GROUPS];
+  // Keep "Other / not listed" fixed at bottom-right of the active grouped category area.
+  const activeSlots = Math.ceil((groupTiles.length + 1) / 5) * 5;
+  while(groupTiles.length < activeSlots - 1){
+    groupTiles.push({ key:`_rm_gap_${groupTiles.length}`, label:"", icon:"block", details:"", blank:true });
   }
-  rmOrdered.push(otherItem);
-  const list = rmOrdered;
+  groupTiles.push(otherItem);
+  const list = groupTiles;
   const isUK = state.destination === "uk";
 
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
         <h1>Screen for Dangerous Goods (KIOSK-410)</h1>
-        <p class="subtitle"><strong>Does your item contain any of the following?</strong> RM rules shown for ${isUK ? "UK" : "International"} destination.</p>
+        <p class="subtitle"><strong>Does your item contain any of the following?</strong> Select a category, then confirm the exact item in a follow-up step.</p>
       </div>
       <span class="pill"><span class="material-symbols-outlined">local_shipping</span> Dangerous goods screen</span>
     </div>
@@ -1246,9 +1381,15 @@ function renderRMDangerous(){
 
   const grid = document.getElementById("rmGrid");
   list.forEach(item => grid.appendChild(tileEl(item, "rm")));
-  if(state.rmSelectedKey){
-    const selected = document.querySelector(`.tile[data-mode="rm"][data-key="${state.rmSelectedKey}"]`);
-    if(selected) selected.classList.add("selected");
+  if(state.rmOtherSelected || state.rmSelectedKey === "rm_other_not_listed"){
+    const selectedOther = document.querySelector('.tile[data-mode="rm"][data-key="rm_other_not_listed"]');
+    if(selectedOther) selectedOther.classList.add("selected");
+  } else if(state.rmSelectedKey){
+    const selectedGroup = rmGroupForRule(state.rmSelectedKey);
+    if(selectedGroup){
+      const selected = document.querySelector(`.tile[data-mode="rm"][data-key="${selectedGroup.key}"]`);
+      if(selected) selected.classList.add("selected");
+    }
   }
   wireRMDangerousDetails(list);
 }
@@ -1270,6 +1411,44 @@ function wireRMDangerousDetails(list){
     banner.className = "banner";
   }
 
+  function showGroupClarifier(group){
+    const rules = rmRulesForGroup(group.key);
+
+    title.innerHTML = `
+      <div class="icon"><span class="material-symbols-outlined">${group.icon || "block"}</span></div>
+      ${escapeHtml(group.label)}
+    `;
+    text.textContent = group.prompt || "Select the best matching item to continue.";
+    inputs.innerHTML = `
+      <div class="rmConditionGroup">
+        <strong>Tell us what is inside</strong>
+        <div class="choiceGroup" id="rmGroupRuleChoices">
+          ${rules.map(rule => `
+            <button type="button" class="choiceBtn" data-rm-rule="${rule.key}">
+              <span>${escapeHtml(rule.label)}</span>
+              <span class="sub">${state.destination === "uk" ? (rule.uk ? "UK allowed with rules" : "Not allowed UK") : (rule.intl ? "International allowed with rules" : "Not allowed International")}</span>
+            </button>
+          `).join("")}
+        </div>
+      </div>
+    `;
+    actions.innerHTML = "";
+    banner.className = "banner warn show";
+    banner.textContent = "Choose the closest match so Royal Mail dangerous goods rules can be applied.";
+
+    inputs.querySelectorAll("[data-rm-rule]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const key = btn.getAttribute("data-rm-rule");
+        const selectedRule = RM_FILTER.find(rule => rule.key === key);
+        if(selectedRule){
+          handleRuleSelection(selectedRule);
+        }
+      });
+    });
+
+    details.classList.add("show");
+  }
+
   function showBlocked(item){
     title.innerHTML = `
       <div class="icon"><span class="material-symbols-outlined">${item.icon || "block"}</span></div>
@@ -1281,6 +1460,46 @@ function wireRMDangerousDetails(list){
     banner.className = "banner danger show";
     banner.textContent = "Not allowed for this destination under Royal Mail dangerous goods rules.";
     details.classList.add("show");
+  }
+
+  function handleRuleSelection(item){
+    const changedSelection = state.rmSelectedKey !== item.key;
+    state.rmSelectedKey = item.key;
+    state.rmOtherSelected = false;
+    if(changedSelection){
+      resetRMConditionCapture();
+    }
+
+    const allowed = rmRuleAllowed(item);
+    state.rmBlockedKey = allowed ? null : item.key;
+
+    if(!allowed){
+      state.rmConditionSatisfied = false;
+      showBlocked(item);
+      return;
+    }
+
+    const requirements = rmRuleRequirements(item);
+    const hasRequirements = requirements.checks.length > 0 || requirements.limits.length > 0;
+    if(!hasRequirements){
+      state.rmConditionSatisfied = true;
+      state.step = 3;
+      render();
+      return;
+    }
+
+    if(state.quickDemoMode){
+      applyQuickDemoRMConditionCapture(item);
+      const quickDemoErrors = validateRMConditionCapture(item);
+      if(!quickDemoErrors.length){
+        state.rmConditionSatisfied = true;
+        state.step = 3;
+        render();
+        return;
+      }
+    }
+
+    showConditionCapture(item);
   }
 
   function showConditionCapture(item){
@@ -1376,8 +1595,8 @@ function wireRMDangerousDetails(list){
   document.querySelectorAll('.tile[data-mode="rm"]').forEach(btn=>{
     btn.addEventListener("click", ()=>{
       const key = btn.dataset.key;
-      const item = list.find(x=>x.key===key);
-      if(!item) return;
+      const tile = list.find(x=>x.key===key);
+      if(!tile) return;
 
       document.querySelectorAll('.tile[data-mode="rm"]').forEach(b=>b.classList.remove("selected"));
       btn.classList.add("selected");
@@ -1394,43 +1613,11 @@ function wireRMDangerousDetails(list){
         return;
       }
 
-      const changedSelection = state.rmSelectedKey !== key;
-      state.rmSelectedKey = key;
-      state.rmOtherSelected = false;
-      if(changedSelection){
-        resetRMConditionCapture();
-      }
-
-      const allowed = rmRuleAllowed(item);
-      state.rmBlockedKey = allowed ? null : key;
-
-      if(!allowed){
-        state.rmConditionSatisfied = false;
-        showBlocked(item);
+      const group = RM_GROUPS.find(x => x.key === key);
+      if(!group){
         return;
       }
-
-      const requirements = rmRuleRequirements(item);
-      const hasRequirements = requirements.checks.length > 0 || requirements.limits.length > 0;
-      if(!hasRequirements){
-        state.rmConditionSatisfied = true;
-        state.step = 3;
-        render();
-        return;
-      }
-
-      if(state.quickDemoMode){
-        applyQuickDemoRMConditionCapture(item);
-        const quickDemoErrors = validateRMConditionCapture(item);
-        if(!quickDemoErrors.length){
-          state.rmConditionSatisfied = true;
-          state.step = 3;
-          render();
-          return;
-        }
-      }
-
-      showConditionCapture(item);
+      showGroupClarifier(group);
     });
   });
 
