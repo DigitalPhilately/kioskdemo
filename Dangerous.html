@@ -143,6 +143,7 @@
     .banner.ok{border:1px solid #c7e7cb;background:#f3fff5;color:#1f5f27;}
 
     .formRow{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;}
+    .formRow.stack{grid-template-columns:1fr;}
     .card{border:1px solid var(--border);background:#fff;border-radius:16px;padding:14px;}
     .card h3{margin:0 0 6px;font-size:16px;color:#2a2550}
     .card p{margin:0 0 10px;color:var(--muted);font-size:13px}
@@ -171,6 +172,49 @@
       border-color:var(--accent2);
       box-shadow:0 0 0 3px rgba(122,104,182,.18);
       background:#fbf9ff;
+    }
+    .demoToggleRow{
+      margin-top:12px;
+      display:flex;
+      justify-content:flex-end;
+    }
+    .demoToggle{
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      color:var(--muted);
+      font-size:12px;
+      font-weight:700;
+      user-select:none;
+    }
+    .demoToggle input{display:none;}
+    .demoToggle .track{
+      width:44px;
+      height:24px;
+      border-radius:999px;
+      background:#d9deeb;
+      border:1px solid #c7cfe0;
+      position:relative;
+      transition:all .15s ease;
+      flex:0 0 auto;
+    }
+    .demoToggle .thumb{
+      width:18px;
+      height:18px;
+      border-radius:50%;
+      background:#fff;
+      position:absolute;
+      top:2px;
+      left:2px;
+      box-shadow:0 1px 3px rgba(0,0,0,.25);
+      transition:all .15s ease;
+    }
+    .demoToggle input:checked + .track{
+      background:#c9f0d3;
+      border-color:#9fd6ae;
+    }
+    .demoToggle input:checked + .track .thumb{
+      left:22px;
     }
     input,select{
       width:100%;padding:10px 12px;border:1px solid var(--border);
@@ -667,7 +711,7 @@ function renderWeigh(){
       <span class="pill"><span class="material-symbols-outlined">scale</span> Item On Scales (KIOSK-404)</span>
     </div>
 
-    <div class="formRow">
+    <div class="formRow stack">
       <div class="card">
         <h3>Capture weight (KIOSK-404)</h3>
         <p>In production this is captured automatically from scales.</p>
@@ -702,10 +746,13 @@ function renderWeigh(){
           </button>
         </div>
         <div class="helpNote">All customers go through Royal Mail dangerous goods screening first. Carrier-specific checks happen later after product selection.</div>
-        <label style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-weight:700;">
-          <input type="checkbox" id="quickDemoToggle" ${state.quickDemoMode ? "checked" : ""}/>
-          <span>Demo fast-track mode: auto-fill example values on every stage so the journey can be completed by clicking Continue only.</span>
-        </label>
+        <div class="demoToggleRow">
+          <label class="demoToggle">
+            <span>Demo fast-track</span>
+            <input type="checkbox" id="quickDemoToggle" ${state.quickDemoMode ? "checked" : ""}/>
+            <span class="track"><span class="thumb"></span></span>
+          </label>
+        </div>
       </div>
     </div>
   `;
