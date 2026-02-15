@@ -687,6 +687,15 @@ function render(){
   else if(state.step === 5) renderBasketAndPay();
   else renderPrintAndConfirm();
 
+  // On RM dangerous goods screen selection is single-tap and auto-advances.
+  if(state.step === 2){
+    nextBtn.style.visibility = "hidden";
+    nextBtn.style.pointerEvents = "none";
+  } else {
+    nextBtn.style.visibility = "visible";
+    nextBtn.style.pointerEvents = "auto";
+  }
+
   if(state.step === 6){
     nextBtn.innerHTML = `Start new transaction <span class="material-symbols-outlined">restart_alt</span>`;
   } else if(state.step === 5){
@@ -841,11 +850,16 @@ function renderProhibited(){
 }
 
 function renderRMDangerous(){
-  const list = padTo25([
-    ...RM_FILTER,
-    { key:"rm_other_not_listed", label:"Other / not listed", icon:"check_circle",
-      details:"Select this if your item does not match any listed category." }
-  ]);
+  const otherItem = {
+    key:"rm_other_not_listed",
+    label:"Other / not listed",
+    icon:"check_circle",
+    details:"Select this if your item does not match any listed category."
+  };
+  const rmOrdered = [...RM_FILTER];
+  // Put "Other / not listed" on the right side (end of first row in 5-column grid).
+  rmOrdered.splice(4, 0, otherItem);
+  const list = padTo25(rmOrdered);
   const isUK = state.destination === "uk";
 
   screen.innerHTML = `
@@ -898,6 +912,8 @@ function wireRMDangerousDetails(list){
         state.rmBlockedKey = null;
         state.rmOtherSelected = true;
         details.classList.remove("show");
+        state.step = 3;
+        render();
         return;
       }
 
@@ -918,6 +934,10 @@ function wireRMDangerousDetails(list){
         banner.textContent = (item.uk && item.intl)
           ? "Allowed for this destination when Royal Mail packaging conditions are met."
           : "Restricted: allowed only on specific destinations/services with conditions.";
+        // Single-tap flow: allowed selections move forward immediately.
+        state.step = 3;
+        render();
+        return;
       } else {
         banner.classList.add("danger");
         banner.textContent = "Not allowed for this destination under Royal Mail dangerous goods rules.";
