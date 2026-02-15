@@ -250,6 +250,30 @@
       background:#f7f6ff;border-radius:12px;color:#3a365a;
       font-size:13px;line-height:1.35;
     }
+    .flowShell{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) 300px;
+      gap:14px;
+      margin-top:14px;
+      align-items:start;
+    }
+    .flowAside{display:grid;gap:14px;}
+    .flowNarrative{
+      background:#f8f9ff;
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:12px;
+      color:#3a365a;
+      font-size:13px;
+      line-height:1.35;
+    }
+    .flowNarrative h4{
+      margin:0 0 8px;
+      color:#2a2550;
+      font-size:14px;
+    }
+    .flowNarrative p{margin:0 0 8px;}
+    .flowNarrative p:last-child{margin-bottom:0;}
     .bottombar{
       display:flex;align-items:center;justify-content:space-between;gap:12px;
       padding:16px;border-top:1px solid var(--border);background:#fff;
@@ -265,6 +289,7 @@
     @media (max-width: 980px){
       .grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;}
       .formRow{grid-template-columns:1fr;}
+      .flowShell{grid-template-columns:1fr;}
       .summary{grid-template-columns:1fr;}
       .choiceRow3{grid-template-columns:1fr;}
       .tile{padding:10px;}
@@ -1332,38 +1357,41 @@ function renderWeigh(){
       <span class="pill"><span class="material-symbols-outlined">scale</span> Item On Scales (KIOSK-404)</span>
     </div>
 
-    <div class="formRow stack">
-      <div class="card">
-        <h3>Customer selects “Post an Item” (KIOSK-402)</h3>
-        <p>Journey is launched for item posting.</p>
-        <div class="helpNote">Flow intent: fail fast on dangerous goods before format sidecar confirmation.</div>
-      </div>
-      <div class="card">
-        <h3>Capture weight (KIOSK-404)</h3>
-        <p>In production this is captured automatically from scales. Kiosk supports up to max system weight.</p>
-        <input id="weightInput" inputmode="numeric" placeholder="e.g. 350" value="${escapeHtml(state.weightG)}" />
-        <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Destination</p>
-        <div class="choiceGroup">
-          <div class="choiceRow" id="destChoices">
-            <button type="button" class="choiceBtn ${state.destination==="uk"?"active":""}" data-value="uk">
-              <span>🇬🇧 UK</span>
-              <span class="sub">Inland</span>
-            </button>
-            <button type="button" class="choiceBtn ${state.destination==="intl"?"active":""}" data-value="intl">
-              <span>🌍 International</span>
-              <span class="sub">Overseas</span>
-            </button>
+    <div class="flowShell">
+      <div class="flowMain">
+        <div class="card">
+          <h3>Capture weight (KIOSK-404)</h3>
+          <p>In production this is captured automatically from scales. Kiosk supports up to max system weight.</p>
+          <input id="weightInput" inputmode="numeric" placeholder="e.g. 350" value="${escapeHtml(state.weightG)}" />
+          <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Destination</p>
+          <div class="choiceGroup">
+            <div class="choiceRow" id="destChoices">
+              <button type="button" class="choiceBtn ${state.destination==="uk"?"active":""}" data-value="uk">
+                <span>🇬🇧 UK</span>
+                <span class="sub">Inland</span>
+              </button>
+              <button type="button" class="choiceBtn ${state.destination==="intl"?"active":""}" data-value="intl">
+                <span>🌍 International</span>
+                <span class="sub">Overseas</span>
+              </button>
+            </div>
+          </div>
+          <div class="demoToggleRow">
+            <label class="demoToggle">
+              <span>Demo fast-track</span>
+              <input type="checkbox" id="quickDemoToggle" ${state.quickDemoMode ? "checked" : ""}/>
+              <span class="track"><span class="thumb"></span></span>
+            </label>
           </div>
         </div>
-        <div class="helpNote">Next: Screen for Dangerous Goods, including Prohibited or Restricted Items (KIOSK-410).</div>
-        <div class="demoToggleRow">
-          <label class="demoToggle">
-            <span>Demo fast-track</span>
-            <input type="checkbox" id="quickDemoToggle" ${state.quickDemoMode ? "checked" : ""}/>
-            <span class="track"><span class="thumb"></span></span>
-          </label>
-        </div>
       </div>
+      <aside class="flowAside">
+        <div class="flowNarrative">
+          <h4>Journey Note</h4>
+          <p>Customer selects “Post an Item” (KIOSK-402) to launch the flow.</p>
+          <p>Next step is Royal Mail dangerous goods screening (KIOSK-410).</p>
+        </div>
+      </aside>
     </div>
   `;
   document.getElementById("weightInput").addEventListener("input", (e)=> {
@@ -1909,10 +1937,9 @@ function renderCaptureItemDetails(){
             `;
           }).join("")}
         </div>
-        <div class="helpNote">Indicative prices are reference-data minima for comparison. Final price is calculated after full service filtering.</div>
   ` : `
         <h3 style="margin-top:14px;">Delivery speed preference (KIOSK-427)</h3>
-        <div class="helpNote">International journey detected. Delivery speed preference is skipped and service filtering continues directly.</div>
+        <div class="tag"><span class="material-symbols-outlined">public</span>Skipped for International</div>
   `;
 
   screen.innerHTML = `
@@ -1924,33 +1951,41 @@ function renderCaptureItemDetails(){
       <span class="pill"><span class="material-symbols-outlined">inventory_2</span> Format sidecar</span>
     </div>
 
-    <div class="formRow stack">
-      <div class="card">
-        <h3>Item offered to format sidecar</h3>
-        <div style="margin-top:10px;">
-          <span class="tag"><span class="material-symbols-outlined">scale</span> ${escapeHtml(state.weightG || "—")} g</span>
-          <span class="tag"><span class="material-symbols-outlined">straighten</span> ${fmt}</span>
-          <span class="tag"><span class="material-symbols-outlined">public</span> ${dest}</span>
-          <span class="tag"><span class="material-symbols-outlined">local_shipping</span> ${profile}</span>
+    <div class="flowShell">
+      <div class="flowMain">
+        <div class="card">
+          <h3>Item offered to format sidecar</h3>
+          <div style="margin-top:10px;">
+            <span class="tag"><span class="material-symbols-outlined">scale</span> ${escapeHtml(state.weightG || "—")} g</span>
+            <span class="tag"><span class="material-symbols-outlined">straighten</span> ${fmt}</span>
+            <span class="tag"><span class="material-symbols-outlined">public</span> ${dest}</span>
+            <span class="tag"><span class="material-symbols-outlined">local_shipping</span> ${profile}</span>
+          </div>
+
+          <h3 style="margin-top:14px;">Confirm format classification (KIOSK-405)</h3>
+          <div class="choiceRow3" id="captureFormatChoices">
+            <button type="button" class="choiceBtn ${state.format==="letter"?"active":""}" data-value="letter"><span>Letter</span></button>
+            <button type="button" class="choiceBtn ${state.format==="large_letter"?"active":""}" data-value="large_letter"><span>Large Letter</span></button>
+            <button type="button" class="choiceBtn ${state.format==="parcel"?"active":""}" data-value="parcel"><span>Parcel</span></button>
+          </div>
+          <label style="display:flex;gap:8px;align-items:flex-start;margin-top:14px;font-weight:700;">
+            <input type="checkbox" id="formatConfirmed" ${state.formatConfirmed ? "checked" : ""}/>
+            <span>I confirm the sidecar classification is correct.</span>
+          </label>
+
+          <h3 style="margin-top:14px;">Declare item value (KIOSK-407)</h3>
+          <input id="declaredValueInput" inputmode="decimal" placeholder="e.g. 49.99" value="${escapeHtml(state.declaredValue)}" />
+
+          ${speedSection}
         </div>
-        <div class="helpNote">Kiosk will use format sidecar for classification confirmation.</div>
-
-        <h3 style="margin-top:14px;">Confirm format classification (KIOSK-405)</h3>
-        <div class="choiceRow3" id="captureFormatChoices">
-          <button type="button" class="choiceBtn ${state.format==="letter"?"active":""}" data-value="letter"><span>Letter</span></button>
-          <button type="button" class="choiceBtn ${state.format==="large_letter"?"active":""}" data-value="large_letter"><span>Large Letter</span></button>
-          <button type="button" class="choiceBtn ${state.format==="parcel"?"active":""}" data-value="parcel"><span>Parcel</span></button>
-        </div>
-        <label style="display:flex;gap:8px;align-items:flex-start;margin-top:14px;font-weight:700;">
-          <input type="checkbox" id="formatConfirmed" ${state.formatConfirmed ? "checked" : ""}/>
-          <span>I confirm the sidecar classification is correct.</span>
-        </label>
-
-        <h3 style="margin-top:14px;">Declare item value (KIOSK-407)</h3>
-        <input id="declaredValueInput" inputmode="decimal" placeholder="e.g. 49.99" value="${escapeHtml(state.declaredValue)}" />
-
-        ${speedSection}
       </div>
+      <aside class="flowAside">
+        <div class="flowNarrative">
+          <h4>Journey Note</h4>
+          <p>Format sidecar confirms the final size classification before service filtering.</p>
+          <p>${isDomestic ? "Delivery preference prices are indicative minimums (reference data)." : "International journeys skip delivery preference and continue to service filtering."}</p>
+        </div>
+      </aside>
     </div>
   `;
 
@@ -2012,72 +2047,81 @@ function renderEvriAdditionalScreening(){
     <div class="stepHeader">
       <div>
         <h1>EVRi/DPD additional screening</h1>
-        <p class="subtitle">Complete carrier-specific prohibited and compensation checks before basket.</p>
+        <p class="subtitle">Carrier-specific checks for EVRi/DPD products.</p>
       </div>
       <span class="pill"><span class="material-symbols-outlined">policy</span> Additional carrier checks</span>
     </div>
 
-    <div class="card" style="margin-bottom:14px;">
-      <h3>Prohibited categories (EVRi/DPD)</h3>
-      <p>Select the matching prohibited category, or choose Other / not listed.</p>
-      <div class="gridWrap">
-        <div class="grid" id="evriProhibitedGrid"></div>
-        <div class="details" id="evriProhibitedDetails">
-          <div class="detailsTop">
-            <div class="detailsTitle" id="evriProhibitedDetailsTitle"></div>
-            <button class="btn" id="evriProhibitedClose"><span class="material-symbols-outlined">close</span>Close</button>
+    <div class="flowShell">
+      <div class="flowMain">
+        <div class="card" style="margin-bottom:14px;">
+          <h3>Prohibited categories (EVRi/DPD)</h3>
+          <div class="gridWrap">
+            <div class="grid" id="evriProhibitedGrid"></div>
+            <div class="details" id="evriProhibitedDetails">
+              <div class="detailsTop">
+                <div class="detailsTitle" id="evriProhibitedDetailsTitle"></div>
+                <button class="btn" id="evriProhibitedClose"><span class="material-symbols-outlined">close</span>Close</button>
+              </div>
+              <div class="detailsText" id="evriProhibitedDetailsText"></div>
+              <div class="banner" id="evriProhibitedBanner"></div>
+            </div>
           </div>
-          <div class="detailsText" id="evriProhibitedDetailsText"></div>
-          <div class="banner" id="evriProhibitedBanner"></div>
+        </div>
+
+        <div class="formRow">
+          <div class="card">
+            <h3>Loss-only compensation categories</h3>
+            <div class="gridWrap">
+              <div class="grid" id="evriLossGrid"></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>No-compensation categories</h3>
+            <div class="gridWrap">
+              <div class="grid" id="evriNoCompGrid"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="details" id="evriCompDetails">
+          <div class="detailsTop">
+            <div class="detailsTitle" id="evriCompDetailsTitle"></div>
+            <button class="btn" id="evriCompClose"><span class="material-symbols-outlined">close</span>Close</button>
+          </div>
+          <div class="detailsText" id="evriCompDetailsText"></div>
+          <div class="banner warn show" style="display:block; margin-top:10px;">
+            This affects compensation eligibility on EVRi/DPD services.
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <span class="tag"><span class="material-symbols-outlined">report</span>${escapeHtml(state.evriAdditionalSelection === "blocked" ? `Prohibited: ${prohibitedLabel}` : "Prohibited: Other / not listed")}</span>
+            <span class="tag"><span class="material-symbols-outlined">package_2</span>Loss-only: ${state.coverLossOnlyKeys.size ? "Yes" : "No"}</span>
+            <span class="tag"><span class="material-symbols-outlined">gpp_bad</span>No-comp: ${state.coverNoCompKeys.size ? "Yes" : "No"}</span>
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+            <button class="btn" id="evriScreeningBack"><span class="material-symbols-outlined">arrow_back</span>Back to services</button>
+            <button class="btn primary" id="evriScreeningConfirm"><span class="material-symbols-outlined">task_alt</span>Confirm EVRi/DPD screening</button>
+          </div>
+          ${state.evriAdditionalSelection === "blocked" ? `
+            <div class="banner danger show" style="display:block; margin-top:10px;">EVRi/DPD prohibited item selected. Choose a different service or change selection.</div>
+          ` : state.evriAdditionalSelection === "clear" ? `
+            <div class="banner ok show" style="display:block; margin-top:10px;">EVRi/DPD additional screening currently clear.</div>
+          ` : `
+            <div class="banner warn show" style="display:block; margin-top:10px;">Select a prohibited outcome to complete screening.</div>
+          `}
         </div>
       </div>
-    </div>
-
-    <div class="formRow">
-      <div class="card">
-        <h3>Loss-only compensation categories</h3>
-        <p>Select any categories that apply.</p>
-        <div class="gridWrap">
-          <div class="grid" id="evriLossGrid"></div>
+      <aside class="flowAside">
+        <div class="flowNarrative">
+          <h4>Journey Note</h4>
+          <p>Select one prohibited outcome first. Use <strong>Other / not listed</strong> for clear items.</p>
+          <p>Loss-only and no-compensation categories are optional multi-select flags for compensation handling.</p>
+          <p>Confirm screening to return to service filtering.</p>
         </div>
-      </div>
-      <div class="card">
-        <h3>No-compensation categories</h3>
-        <p>Select any categories that apply.</p>
-        <div class="gridWrap">
-          <div class="grid" id="evriNoCompGrid"></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="details" id="evriCompDetails">
-      <div class="detailsTop">
-        <div class="detailsTitle" id="evriCompDetailsTitle"></div>
-        <button class="btn" id="evriCompClose"><span class="material-symbols-outlined">close</span>Close</button>
-      </div>
-      <div class="detailsText" id="evriCompDetailsText"></div>
-      <div class="banner warn show" style="display:block; margin-top:10px;">
-        This affects compensation eligibility on EVRi/DPD services.
-      </div>
-    </div>
-
-    <div class="card" style="margin-top:14px;">
-      <div class="helpNote">
-        <strong>Current prohibited outcome:</strong> ${escapeHtml(state.evriAdditionalSelection === "blocked" ? `Prohibited (${prohibitedLabel})` : "Other / not listed")}<br/>
-        <strong>Loss-only selected:</strong> ${state.coverLossOnlyKeys.size ? "Yes" : "No"}<br/>
-        <strong>No-compensation selected:</strong> ${state.coverNoCompKeys.size ? "Yes" : "No"}
-      </div>
-      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
-        <button class="btn" id="evriScreeningBack"><span class="material-symbols-outlined">arrow_back</span>Back to services</button>
-        <button class="btn primary" id="evriScreeningConfirm"><span class="material-symbols-outlined">task_alt</span>Confirm EVRi/DPD screening</button>
-      </div>
-      ${state.evriAdditionalSelection === "blocked" ? `
-        <div class="banner danger show" style="display:block; margin-top:10px;">EVRi/DPD prohibited item selected. Choose a different service or change selection.</div>
-      ` : state.evriAdditionalSelection === "clear" ? `
-        <div class="banner ok show" style="display:block; margin-top:10px;">EVRi/DPD additional screening currently clear.</div>
-      ` : `
-        <div class="banner warn show" style="display:block; margin-top:10px;">Select a prohibited outcome to complete screening.</div>
-      `}
+      </aside>
     </div>
   `;
 
@@ -2215,6 +2259,21 @@ function renderFilterAndPresentOptions(){
   const evriProhibitedLabel = state.evriSelectedProhibitedKey
     ? (PROHIBITED.find(x => x.key === state.evriSelectedProhibitedKey)?.label || state.evriSelectedProhibitedKey)
     : "Other / not listed";
+  const narrativeSpeed = isDomestic
+    ? `Delivery preference: ${deliveryPreferenceText}.`
+    : "International destination: delivery preference skipped.";
+  const narrativeRM = selectedRMRule
+    ? `RM DG selection: ${selectedRMRule.label}${state.rmConditionSatisfied ? " (conditions complete)." : " (conditions pending)."}` 
+    : "RM DG selection: not set.";
+  const narrativeCarrier = needsEvriAdditional
+    ? `EVRi/DPD screening: ${state.evriScreeningComplete ? "complete" : "pending"}${state.evriAdditionalSelection === "blocked" ? ` (blocked by ${evriProhibitedLabel})` : ""}.`
+    : "Carrier-specific EVRi/DPD screening not required for current service.";
+  const narrativeNI = showNI
+    ? `NI/Windsor checks: ${state.niCustomsConfirmed ? "complete" : "pending"}${state.niCustomsReference ? ` (${state.niCustomsReference})` : ""}.`
+    : "NI/Windsor checks not required for current postcode.";
+  const narrativeNIRule = showRMNISpecial && niStatus.message
+    ? `NI route rule: ${niStatus.message}`
+    : "";
 
   screen.innerHTML = `
     <div class="stepHeader">
@@ -2225,48 +2284,35 @@ function renderFilterAndPresentOptions(){
       <span class="pill"><span class="material-symbols-outlined">tune</span> Service filtering</span>
     </div>
 
-    <div class="formRow">
-      <div class="card">
-        <h3>Service filtering (KIOSK-413 / KIOSK-415 / KIOSK-428)</h3>
-        <div class="helpNote">
-          ${isDomestic
-            ? `Using delivery preference: <strong>${escapeHtml(deliveryPreferenceText)}</strong>. Services are filtered to this domestic speed bucket.`
-            : `International destination selected: delivery speed preference is skipped and all eligible international services are shown.`}
-        </div>
-        ${selectedRMRule ? `
-          <div class="helpNote" style="margin-top:10px;">
-            <strong>RM dangerous goods category:</strong> ${escapeHtml(selectedRMRule.label)}<br/>
-            ${state.rmConditionSatisfied ? "RM condition checks completed." : "RM condition checks pending."}
+    <div class="flowShell">
+      <div class="flowMain">
+        <div class="formRow">
+          <div class="card">
+            <h3>Service filtering (KIOSK-413 / KIOSK-415 / KIOSK-428)</h3>
+            <h3 style="margin-top:14px;">Available services (KIOSK-414)</h3>
+            <div class="choiceGroup" id="serviceChoices">
+              ${services.length ? services.map(service => `
+                <button type="button" class="choiceBtn ${state.selectedServiceId===service.id?"active":""}" data-service-id="${service.id}">
+                  <span>${escapeHtml(service.name)}</span>
+                  <span class="sub">${service.tracked ? "Tracked" : "Untracked"} • £${calculateServicePrice(service).toFixed(2)}</span>
+                </button>
+              `).join("") : `
+                <div class="banner danger show" style="display:block;">No services available for current filters. Adjust speed or item details.</div>
+              `}
+            </div>
           </div>
-        ` : ""}
 
-        <h3 style="margin-top:14px;">Available services (KIOSK-414)</h3>
-        <div class="choiceGroup" id="serviceChoices">
-          ${services.length ? services.map(service => `
-            <button type="button" class="choiceBtn ${state.selectedServiceId===service.id?"active":""}" data-service-id="${service.id}">
-              <span>${escapeHtml(service.name)}</span>
-              <span class="sub">${service.tracked ? "Tracked" : "Untracked"} • £${calculateServicePrice(service).toFixed(2)}</span>
-            </button>
-          `).join("") : `
-            <div class="banner danger show" style="display:block;">No services available for current filters. Adjust speed, details, or screening selections.</div>
-          `}
-        </div>
-      </div>
+          <div class="card">
+            <h3>Enter address details (KIOSK-866)</h3>
+            <p>Recipient details</p>
+            <input id="recipientPostcodeInput" placeholder="Recipient postcode (e.g. SW1A 1AA)" value="${escapeHtml(state.recipientPostcode)}" />
+            <input id="recipientAddressInput" placeholder="Recipient address line" value="${escapeHtml(state.recipientAddress)}" style="margin-top:8px;" />
+            <p style="margin-top:10px;">Sender details</p>
+            <input id="senderPostcodeInput" placeholder="Sender postcode" value="${escapeHtml(state.senderPostcode)}" />
+            <input id="senderAddressInput" placeholder="Sender address line" value="${escapeHtml(state.senderAddress)}" style="margin-top:8px;" />
 
-      <div class="card">
-        <h3>Enter address details (KIOSK-866)</h3>
-        <p>Recipient details</p>
-        <input id="recipientPostcodeInput" placeholder="Recipient postcode (e.g. SW1A 1AA)" value="${escapeHtml(state.recipientPostcode)}" />
-        <input id="recipientAddressInput" placeholder="Recipient address line" value="${escapeHtml(state.recipientAddress)}" style="margin-top:8px;" />
-        <p style="margin-top:10px;">Sender details</p>
-        <input id="senderPostcodeInput" placeholder="Sender postcode" value="${escapeHtml(state.senderPostcode)}" />
-        <input id="senderAddressInput" placeholder="Sender address line" value="${escapeHtml(state.senderAddress)}" style="margin-top:8px;" />
-
-        ${showNI ? `
-          <div class="helpNote" style="margin-top:12px;">
-            <strong>Northern Ireland / Windsor Framework support (KIOSK-867):</strong><br/>
-            BT postcode detected. Additional questions are required.
-          </div>
+            ${showNI ? `
+          <h3 style="margin-top:14px;">Northern Ireland / Windsor checks (KIOSK-867)</h3>
           <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Does parcel include sanitary/phytosanitary goods (e.g. meat, dairy, plants)?</p>
           <div class="choiceRow" id="niSpsChoices">
             <button type="button" class="choiceBtn ${state.niSpsCategory==="no"?"active":""}" data-value="no"><span>No</span></button>
@@ -2290,9 +2336,7 @@ function renderFilterAndPresentOptions(){
           ` : ""}
 
           ${showRMNISpecial && selectedRMRule.niRule === "perishable_extra" ? `
-            <div class="helpNote" style="margin-top:10px;">
-              <strong>Additional RM perishable checks (GB to NI):</strong> confirm whether this is allowed content under Windsor rules.
-            </div>
+            <h3 style="margin-top:14px;">Additional RM perishable checks</h3>
             ${state.niSpsCategory === "yes" ? `
               <div class="choiceGroup" id="rmPerishableRouteChoices" style="margin-top:8px;">
                 <button type="button" class="choiceBtn ${state.rmNiPerishableRoute==="confectionery_only"?"active":""}" data-value="confectionery_only">
@@ -2311,26 +2355,22 @@ function renderFilterAndPresentOptions(){
               ${state.rmNiPerishableRoute === "plants_certified" ? `
                 <input id="rmNiPlantCertRefInput" placeholder="Plant/flower certification reference" value="${escapeHtml(state.rmNiPlantCertRef)}" style="margin-top:8px;" />
               ` : ""}
-            ` : `
-              <div class="helpNote" style="margin-top:8px;">SPS content is set to "No", so no additional RM perishable block is triggered.</div>
-            `}
+            ` : ""}
             ${niStatus.message ? `
               <div class="banner ${niStatus.blocked ? "danger" : "warn"} show" style="display:block; margin-top:10px;">
                 ${escapeHtml(niStatus.message)}
               </div>
             ` : ""}
           ` : ""}
-        ` : ""}
+            ` : ""}
 
-        <label style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-weight:700;">
-          <input type="checkbox" id="proofDeliveryInput" ${state.proofOfDelivery ? "checked" : ""}/>
-          <span>Offer proof of delivery optional add-on (KIOSK-416)</span>
-        </label>
+            <label style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-weight:700;">
+              <input type="checkbox" id="proofDeliveryInput" ${state.proofOfDelivery ? "checked" : ""}/>
+              <span>Offer proof of delivery optional add-on (KIOSK-416)</span>
+            </label>
 
-        ${needsEvriAdditional ? `
-          <div class="helpNote" style="margin-top:12px;">
-            <strong>EVRi/DPD additional screening required:</strong> open the dedicated screening screens before basket.
-          </div>
+            ${needsEvriAdditional ? `
+          <h3 style="margin-top:14px;">EVRi/DPD additional screening</h3>
           <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
             <button type="button" class="btn" id="openEvriScreeningBtn">
               <span class="material-symbols-outlined">fact_check</span>Open EVRi/DPD screening screens
@@ -2339,11 +2379,6 @@ function renderFilterAndPresentOptions(){
               <span class="material-symbols-outlined">restart_alt</span>Reset screening
             </button>
           </div>
-          <div class="helpNote" style="margin-top:10px;">
-            <strong>Current screening result:</strong> ${state.evriAdditionalSelection === "blocked" ? `Prohibited (${escapeHtml(evriProhibitedLabel)})` : (state.evriAdditionalSelection === "clear" ? "Other / not listed" : "Not completed")}<br/>
-            <strong>Loss-only selected:</strong> ${state.evriLossOnlySelected ? "Yes" : "No"}<br/>
-            <strong>No-compensation selected:</strong> ${state.evriNoCompSelected ? "Yes" : "No"}
-          </div>
           ${state.evriAdditionalSelection==="blocked" ? `
             <div class="banner danger show" style="display:block; margin-top:10px;">EVRi/DPD prohibited item selected. Cannot proceed with this service.</div>
           ` : state.evriScreeningComplete ? `
@@ -2351,8 +2386,20 @@ function renderFilterAndPresentOptions(){
           ` : `
             <div class="banner warn show" style="display:block; margin-top:10px;">Complete EVRi/DPD screening screens before continuing.</div>
           `}
-        ` : ""}
+            ` : ""}
+          </div>
+        </div>
       </div>
+      <aside class="flowAside">
+        <div class="flowNarrative">
+          <h4>Journey Note</h4>
+          <p>${escapeHtml(narrativeSpeed)}</p>
+          <p>${escapeHtml(narrativeRM)}</p>
+          <p>${escapeHtml(narrativeNI)}</p>
+          ${narrativeNIRule ? `<p>${escapeHtml(narrativeNIRule)}</p>` : ""}
+          <p>${escapeHtml(narrativeCarrier)}</p>
+        </div>
+      </aside>
     </div>
   `;
 
