@@ -332,7 +332,7 @@ const state = {
   formatConfirmed: false,
   declaredValue: "",
   contentDescription: "",
-  deliverySpeed: "balanced",
+  deliverySpeed: "",
   recipientPostcode: "",
   recipientAddress: "",
   senderPostcode: "",
@@ -350,6 +350,7 @@ const state = {
   paymentComplete: false,
   labelsPrinted: false,
   transactionRef: "",
+  auditEvents: [],
 };
 
 /* ---------------------------
@@ -844,16 +845,74 @@ const NO_COMP = [
 
 // SERVICE CATALOGUE (demo only)
 const SERVICES = [
-  { id:"evri_standard", profile:"evri_dpd", name:"EVRi Standard", speed:"balanced", tracked:true, intl:false, maxWeight:15000, basePrice:3.69 },
-  { id:"dpd_next_day", profile:"evri_dpd", name:"DPD Next Day", speed:"fast", tracked:true, intl:false, maxWeight:20000, basePrice:6.99 },
-  { id:"dpd_classic", profile:"evri_dpd", name:"DPD Classic", speed:"balanced", tracked:true, intl:false, maxWeight:30000, basePrice:5.49 },
-  { id:"evri_international", profile:"evri_dpd", name:"EVRi International", speed:"balanced", tracked:true, intl:true, maxWeight:10000, basePrice:9.99 },
-  { id:"rm_2nd_class", profile:"royal_mail", name:"Royal Mail 2nd Class", speed:"balanced", tracked:false, intl:false, maxWeight:20000, basePrice:3.39 },
-  { id:"rm_1st_class", profile:"royal_mail", name:"Royal Mail 1st Class", speed:"fast", tracked:false, intl:false, maxWeight:20000, basePrice:4.59 },
-  { id:"rm_tracked_48", profile:"royal_mail", name:"RM Tracked 48", speed:"balanced", tracked:true, intl:false, maxWeight:20000, basePrice:4.99 },
-  { id:"rm_tracked_24", profile:"royal_mail", name:"RM Tracked 24", speed:"fast", tracked:true, intl:false, maxWeight:20000, basePrice:6.29 },
-  { id:"rm_international_tracked", profile:"royal_mail", name:"RM International Tracked", speed:"balanced", tracked:true, intl:true, maxWeight:2000, basePrice:11.99 },
+  { id:"evri_standard", profile:"evri_dpd", name:"EVRi Standard", tracked:true, intl:false, maxWeight:15000, basePrice:3.69, deliveryPreference:"two_to_three_days" },
+  { id:"dpd_next_day", profile:"evri_dpd", name:"DPD Next Day", tracked:true, intl:false, maxWeight:20000, basePrice:6.99, deliveryPreference:"guaranteed_next_day" },
+  { id:"dpd_classic", profile:"evri_dpd", name:"DPD Classic", tracked:true, intl:false, maxWeight:30000, basePrice:5.49, deliveryPreference:"two_to_three_days" },
+  { id:"evri_international", profile:"evri_dpd", name:"EVRi International", tracked:true, intl:true, maxWeight:10000, basePrice:9.99, deliveryPreference:"" },
+  { id:"rm_2nd_class", profile:"royal_mail", name:"Royal Mail 2nd Class", tracked:false, intl:false, maxWeight:20000, basePrice:3.39, deliveryPreference:"two_to_three_days" },
+  { id:"rm_1st_class", profile:"royal_mail", name:"Royal Mail 1st Class", tracked:false, intl:false, maxWeight:20000, basePrice:4.59, deliveryPreference:"aimed_next_day" },
+  { id:"rm_tracked_48", profile:"royal_mail", name:"RM Tracked 48", tracked:true, intl:false, maxWeight:20000, basePrice:4.99, deliveryPreference:"two_to_three_days" },
+  { id:"rm_tracked_24", profile:"royal_mail", name:"RM Tracked 24", tracked:true, intl:false, maxWeight:20000, basePrice:6.29, deliveryPreference:"aimed_next_day" },
+  { id:"rm_special_next_day", profile:"royal_mail", name:"RM Special Guaranteed", tracked:true, intl:false, maxWeight:20000, basePrice:8.99, deliveryPreference:"guaranteed_next_day" },
+  { id:"rm_international_tracked", profile:"royal_mail", name:"RM International Tracked", tracked:true, intl:true, maxWeight:2000, basePrice:11.99, deliveryPreference:"" },
 ];
+
+// Reference-data model for domestic delivery preferences.
+// Can be overridden at runtime via window.KIOSK_REFERENCE_DATA or localStorage key kiosk_reference_data.
+const DEFAULT_REFERENCE_DATA = {
+  domesticDeliveryPreferences: [
+    { key:"guaranteed_next_day", label:"Guaranteed next day" },
+    { key:"aimed_next_day", label:"Aimed to deliver next day" },
+    { key:"two_to_three_days", label:"2-3 working days" }
+  ],
+  domesticDeliveryPreferenceServiceMap: {
+    guaranteed_next_day: ["dpd_next_day", "rm_special_next_day"],
+    aimed_next_day: ["rm_1st_class", "rm_tracked_24"],
+    two_to_three_days: ["evri_standard", "dpd_classic", "rm_2nd_class", "rm_tracked_48"]
+  }
+};
+
+function loadReferenceData(){
+  const ref = JSON.parse(JSON.stringify(DEFAULT_REFERENCE_DATA));
+  let override = null;
+  if(typeof window !== "undefined"){
+    if(window.KIOSK_REFERENCE_DATA && typeof window.KIOSK_REFERENCE_DATA === "object"){
+      override = window.KIOSK_REFERENCE_DATA;
+    } else {
+      try{
+        const raw = window.localStorage ? window.localStorage.getItem("kiosk_reference_data") : null;
+        if(raw) override = JSON.parse(raw);
+      } catch(_err){
+        override = null;
+      }
+    }
+  }
+  if(!override || typeof override !== "object") return ref;
+
+  if(Array.isArray(override.domesticDeliveryPreferences)){
+    const options = override.domesticDeliveryPreferences
+      .filter(opt => opt && typeof opt.key === "string" && typeof opt.label === "string")
+      .map(opt => ({ key: String(opt.key), label: String(opt.label) }));
+    if(options.length){
+      ref.domesticDeliveryPreferences = options;
+    }
+  }
+  if(override.domesticDeliveryPreferenceServiceMap && typeof override.domesticDeliveryPreferenceServiceMap === "object"){
+    const map = {};
+    Object.keys(override.domesticDeliveryPreferenceServiceMap).forEach(key => {
+      const ids = override.domesticDeliveryPreferenceServiceMap[key];
+      if(Array.isArray(ids)){
+        map[key] = ids.map(id => String(id));
+      }
+    });
+    if(Object.keys(map).length){
+      ref.domesticDeliveryPreferenceServiceMap = map;
+    }
+  }
+  return ref;
+}
+
+const REFERENCE_DATA = loadReferenceData();
 
 /* ---------------------------
    Helpers
@@ -1042,6 +1101,63 @@ function numericValue(value){
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function isDomesticJourney(){
+  return state.destination === "uk";
+}
+
+function domesticDeliveryPreferences(){
+  return Array.isArray(REFERENCE_DATA.domesticDeliveryPreferences)
+    ? REFERENCE_DATA.domesticDeliveryPreferences
+    : [];
+}
+
+function deliveryPreferenceLabel(code){
+  const option = domesticDeliveryPreferences().find(x => x.key === code);
+  return option ? option.label : "Not selected";
+}
+
+function isValidDomesticDeliveryPreference(code){
+  return domesticDeliveryPreferences().some(option => option.key === code);
+}
+
+function deliveryPreferenceServiceIds(code){
+  const map = REFERENCE_DATA.domesticDeliveryPreferenceServiceMap || {};
+  const ids = map[code];
+  return Array.isArray(ids) ? ids : [];
+}
+
+function serviceMatchesDeliveryPreference(service, code){
+  const mappedIds = deliveryPreferenceServiceIds(code);
+  if(mappedIds.length){
+    return mappedIds.includes(service.id);
+  }
+  return service.deliveryPreference === code;
+}
+
+function deliveryPreferenceIndicativeFrom(code){
+  const candidates = SERVICES.filter(service =>
+    !service.intl && serviceMatchesDeliveryPreference(service, code)
+  );
+  if(!candidates.length) return null;
+  const min = candidates.reduce((lowest, service) => Math.min(lowest, service.basePrice), Number.POSITIVE_INFINITY);
+  return Number.isFinite(min) ? Number(min.toFixed(2)) : null;
+}
+
+function logAudit(eventType, payload = {}){
+  const entry = {
+    at: new Date().toISOString(),
+    eventType,
+    ...payload
+  };
+  state.auditEvents.push(entry);
+  if(state.auditEvents.length > 100){
+    state.auditEvents.splice(0, state.auditEvents.length - 100);
+  }
+  if(typeof console !== "undefined" && typeof console.info === "function"){
+    console.info("[AUDIT]", entry);
+  }
+}
+
 function selectedService(){
   return SERVICES.find(s => s.id === state.selectedServiceId) || null;
 }
@@ -1060,10 +1176,8 @@ function availableServices(){
   list = list.filter(s => isIntl ? s.intl : true);
   if(!isIntl) list = list.filter(s => s.intl ? false : true);
 
-  if(state.deliverySpeed === "fast"){
-    list = list.filter(s => s.speed === "fast");
-  } else if(state.deliverySpeed === "tracked"){
-    list = list.filter(s => s.tracked);
+  if(!isIntl && isValidDomesticDeliveryPreference(state.deliverySpeed)){
+    list = list.filter(service => serviceMatchesDeliveryPreference(service, state.deliverySpeed));
   }
 
   // Prioritise tracked services in display order (mirrors KIOSK-415 intent).
@@ -1105,7 +1219,15 @@ function applyQuickDemoDefaults(){
   if(state.format && !state.formatConfirmed) state.formatConfirmed = true;
   if(!state.declaredValue) state.declaredValue = "39.99";
   if(!state.contentDescription) state.contentDescription = "Books and stationery";
-  if(!state.deliverySpeed) state.deliverySpeed = "balanced";
+  if(isDomesticJourney()){
+    const prefs = domesticDeliveryPreferences();
+    const valid = prefs.some(opt => opt.key === state.deliverySpeed);
+    if(!valid){
+      state.deliverySpeed = (prefs.find(opt => opt.key === "two_to_three_days") || prefs[0] || { key:"" }).key;
+    }
+  } else {
+    state.deliverySpeed = "";
+  }
   if(!state.recipientPostcode) state.recipientPostcode = "BT1 5GS";
   if(!state.recipientAddress) state.recipientAddress = "1 Royal Avenue, Belfast";
   if(!state.senderPostcode) state.senderPostcode = "EC1A 1AA";
@@ -1264,6 +1386,13 @@ function renderWeigh(){
       state.rmBlockedKey = null;
       state.rmOtherSelected = false;
       resetRMConditionCapture();
+      if(state.destination === "uk"){
+        if(!domesticDeliveryPreferences().some(opt => opt.key === state.deliverySpeed)){
+          state.deliverySpeed = "";
+        }
+      } else {
+        state.deliverySpeed = "";
+      }
       state.evriAdditionalSelection = "";
       state.evriAdditionalBlocked = false;
       state.evriScreeningComplete = false;
@@ -1756,6 +1885,27 @@ function renderCaptureItemDetails(){
   const dest = state.destination === "uk" ? "UK Inland" : "International";
   const service = selectedService();
   const profile = service ? (service.profile === "royal_mail" ? "Royal Mail" : "EVRi / DPD") : "Not selected yet";
+  const isDomestic = isDomesticJourney();
+  const speedOptions = domesticDeliveryPreferences();
+  const speedSection = isDomestic ? `
+        <h3 style="margin-top:14px;">Delivery speed preference (KIOSK-427)</h3>
+        <div class="choiceRow3" id="captureSpeedChoices">
+          ${speedOptions.map(option => {
+            const from = deliveryPreferenceIndicativeFrom(option.key);
+            const fromText = from === null ? "from --" : `from £${from.toFixed(2)}`;
+            return `
+              <button type="button" class="choiceBtn ${state.deliverySpeed===option.key?"active":""}" data-value="${escapeHtml(option.key)}">
+                <span>${escapeHtml(option.label)}</span>
+                <span class="sub">${escapeHtml(fromText)}</span>
+              </button>
+            `;
+          }).join("")}
+        </div>
+        <div class="helpNote">Indicative prices are reference-data minima for comparison. Final price is calculated after full service filtering.</div>
+  ` : `
+        <h3 style="margin-top:14px;">Delivery speed preference (KIOSK-427)</h3>
+        <div class="helpNote">International journey detected. Delivery speed preference is skipped and service filtering continues directly.</div>
+  `;
 
   screen.innerHTML = `
     <div class="stepHeader">
@@ -1791,12 +1941,7 @@ function renderCaptureItemDetails(){
         <h3 style="margin-top:14px;">Declare item value (KIOSK-407)</h3>
         <input id="declaredValueInput" inputmode="decimal" placeholder="e.g. 49.99" value="${escapeHtml(state.declaredValue)}" />
 
-        <h3 style="margin-top:14px;">Delivery speed preference (KIOSK-427)</h3>
-        <div class="choiceRow3" id="captureSpeedChoices">
-          <button type="button" class="choiceBtn ${state.deliverySpeed==="balanced"?"active":""}" data-value="balanced"><span>Balanced</span></button>
-          <button type="button" class="choiceBtn ${state.deliverySpeed==="fast"?"active":""}" data-value="fast"><span>Fastest</span></button>
-          <button type="button" class="choiceBtn ${state.deliverySpeed==="tracked"?"active":""}" data-value="tracked"><span>Tracked only</span></button>
-        </div>
+        ${speedSection}
       </div>
     </div>
   `;
@@ -1822,16 +1967,29 @@ function renderCaptureItemDetails(){
     state.declaredValue = raw.slice(0, 10);
     e.target.value = state.declaredValue;
   });
-  document.querySelectorAll("#captureSpeedChoices .choiceBtn").forEach(btn=>{
+  const speedChoices = document.querySelectorAll("#captureSpeedChoices .choiceBtn");
+  speedChoices.forEach(btn=>{
     btn.addEventListener("click", ()=>{
-      state.deliverySpeed = btn.dataset.value || "balanced";
-      document.querySelectorAll("#captureSpeedChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
+      state.deliverySpeed = btn.dataset.value || "";
+      speedChoices.forEach(b=>b.classList.toggle("active", b===btn));
+      const speedLabel = deliveryPreferenceLabel(state.deliverySpeed);
+      const indicativeFrom = deliveryPreferenceIndicativeFrom(state.deliverySpeed);
+      logAudit("delivery_speed_selected", {
+        destination: state.destination || "unknown",
+        deliverySpeed: state.deliverySpeed,
+        deliverySpeedLabel: speedLabel,
+        indicativeFrom: indicativeFrom === null ? null : Number(indicativeFrom.toFixed(2))
+      });
     });
   });
 }
 
 function renderFilterAndPresentOptions(){
   const services = availableServices();
+  const isDomestic = isDomesticJourney();
+  const deliveryPreferenceText = isDomestic
+    ? deliveryPreferenceLabel(state.deliverySpeed || "")
+    : "Not required for international";
   const showNI = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
   const showGBToNI = isGBToNIJourney();
   const selectedRMRule = currentRMRule();
@@ -1852,7 +2010,11 @@ function renderFilterAndPresentOptions(){
     <div class="formRow">
       <div class="card">
         <h3>Service filtering (KIOSK-413 / KIOSK-415 / KIOSK-428)</h3>
-        <div class="helpNote">Using speed preference: <strong>${escapeHtml(state.deliverySpeed)}</strong>. Services are pre-filtered by item data/restrictions and tracked services are prioritised.</div>
+        <div class="helpNote">
+          ${isDomestic
+            ? `Using delivery preference: <strong>${escapeHtml(deliveryPreferenceText)}</strong>. Services are filtered to this domestic speed bucket.`
+            : `International destination selected: delivery speed preference is skipped and all eligible international services are shown.`}
+        </div>
         ${selectedRMRule ? `
           <div class="helpNote" style="margin-top:10px;">
             <strong>RM dangerous goods category:</strong> ${escapeHtml(selectedRMRule.label)}<br/>
@@ -2230,6 +2392,8 @@ function renderSummary(){
   const ncLabels = [...state.coverNoCompKeys].map(k => NO_COMP.find(x=>x.key===k)?.label).filter(Boolean);
   const rmSelected = RM_FILTER.find(x=>x.key===state.rmSelectedKey)?.label || (state.rmOtherSelected ? "Other / not listed" : "None");
   const rmNi = rmNIStatus();
+  const speedDisplay = isDomesticJourney() ? deliveryPreferenceLabel(state.deliverySpeed || "") : "Skipped (International)";
+  const lastSpeedAudit = [...state.auditEvents].reverse().find(entry => entry.eventType === "delivery_speed_selected");
 
   screen.innerHTML = `
     <div class="stepHeader">
@@ -2281,6 +2445,8 @@ function renderSummary(){
             <strong>RM filter selection:</strong> ${escapeHtml(rmSelected)}<br/>
             <strong>RM condition checks:</strong> ${state.rmOtherSelected ? "Not required (Other selected)" : (state.rmConditionSatisfied ? "Completed" : "Not completed")}<br/>
             <strong>RM GB to NI status:</strong> ${rmNi.ok ? "Clear" : escapeHtml(rmNi.message || "Blocked or incomplete")}<br/>
+            <strong>Delivery preference:</strong> ${escapeHtml(speedDisplay)}<br/>
+            <strong>Delivery preference audit:</strong> ${lastSpeedAudit ? `${escapeHtml(lastSpeedAudit.at)} (${escapeHtml(lastSpeedAudit.deliverySpeedLabel || lastSpeedAudit.deliverySpeed || "Unknown")})` : "No speed event logged"}<br/>
             <strong>EVRi/DPD loss-only flag:</strong> ${state.evriLossOnlySelected ? "Yes" : "No"}<br/>
             <strong>EVRi/DPD no-comp flag:</strong> ${state.evriNoCompSelected ? "Yes" : "No"}<br/>
             <strong>Legacy restricted flags:</strong> ${restrictedLabels.length ? escapeHtml(restrictedLabels.join(", ")) : "None"} / ${lossLabels.length ? escapeHtml(lossLabels.join(", ")) : "None"} / ${ncLabels.length ? escapeHtml(ncLabels.join(", ")) : "None"}
@@ -2414,7 +2580,8 @@ function canContinue(){
   }
 
   if(state.step === 3){
-    return !!state.format && !!state.formatConfirmed && numericValue(state.declaredValue) > 0 && !!state.deliverySpeed;
+    const speedOk = !isDomesticJourney() || isValidDomesticDeliveryPreference(state.deliverySpeed);
+    return !!state.format && !!state.formatConfirmed && numericValue(state.declaredValue) > 0 && speedOk;
   }
 
   if(state.step === 4){
@@ -2458,7 +2625,9 @@ function next(){
       return;
     }
     if(state.step === 3){
-      alert("Confirm format classification, declare item value, and choose delivery speed preference before continuing.");
+      alert(isDomesticJourney()
+        ? "Confirm format classification, declare item value, and choose delivery speed preference before continuing."
+        : "Confirm format classification and declare item value before continuing.");
       return;
     }
     if(state.step === 4){
@@ -2522,7 +2691,7 @@ function resetAll(){
   state.formatConfirmed = false;
   state.declaredValue = "";
   state.contentDescription = "";
-  state.deliverySpeed = "balanced";
+  state.deliverySpeed = "";
   state.recipientPostcode = "";
   state.recipientAddress = "";
   state.senderPostcode = "";
@@ -2540,6 +2709,7 @@ function resetAll(){
   state.paymentComplete = false;
   state.labelsPrinted = false;
   state.transactionRef = "";
+  state.auditEvents = [];
   render();
 }
 
