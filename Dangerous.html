@@ -116,6 +116,8 @@
       background:#fff;border-radius:16px;padding:14px;display:none;
       position:absolute;left:14px;right:14px;top:14px;z-index:30;
       box-shadow:var(--shadow);
+      max-height:calc(100% - 28px);
+      overflow:auto;
     }
     .details.show{display:block;}
     .detailsTop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}
@@ -141,6 +143,26 @@
     .banner.danger{border:1px solid #f0b8b8;background:#fff6f6;color:#8b1f1f;}
     .banner.warn{border:1px solid #ffd6a5;background:#fff8ee;color:#7a3f00;}
     .banner.ok{border:1px solid #c7e7cb;background:#f3fff5;color:#1f5f27;}
+    .rmConditionGroup{margin-top:10px;display:grid;gap:8px;}
+    .rmConditionCheck{
+      display:flex;
+      gap:8px;
+      align-items:flex-start;
+      font-weight:700;
+      color:#273047;
+    }
+    .rmConditionLimit{
+      display:grid;
+      grid-template-columns:1fr 130px;
+      gap:10px;
+      align-items:center;
+    }
+    .rmConditionActions{
+      margin-top:12px;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
 
     .formRow{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px;}
     .formRow.stack{grid-template-columns:1fr;}
@@ -295,6 +317,9 @@ const state = {
   rmSelectedKey: null,
   rmBlockedKey: null,
   rmOtherSelected: false,
+  rmConditionChecks: {},
+  rmConditionValues: {},
+  rmConditionSatisfied: false,
   evriAdditionalSelection: "",
   evriAdditionalBlocked: false,
   evriScreeningComplete: false,
@@ -316,6 +341,8 @@ const state = {
   niCustomsReference: "",
   niSpsCategory: "",
   niPrivateIndividual: "",
+  rmNiPerishableRoute: "",
+  rmNiPlantCertRef: "",
   proofOfDelivery: false,
   selectedServiceId: "",
   basketAdded: false,
@@ -407,53 +434,224 @@ const RESTRICTED = [
     details:"Perfume may be allowable only under specific limits and packaging rules. Check destination restrictions." },
 ];
 
+const RM_CHECK_LABELS = {
+  counter_presentation: "Presented at a Post Office counter where required.",
+  sender_details_visible: "Sender name and return address are clearly visible on the parcel.",
+  valves_protected: "Valves are protected to prevent accidental release.",
+  tightly_packed: "Items are tightly packed to prevent movement.",
+  wrapped_polythene_taped: "Items are wrapped in polythene and sealed with tape.",
+  absorbent_and_cushioned: "Absorbent material and cushioning are used as required.",
+  fragile_if_glass: "Parcel is marked FRAGILE when glass is present.",
+  original_retail_packaging: "Item is in original retail packaging where required.",
+  strong_outer_packaging: "Strong outer packaging is used.",
+  short_circuit_protected: "Battery terminals/cells are protected from short circuit.",
+  un38_3_compliant: "Cells/batteries are UN 38.3 compliant.",
+  batteries_not_damaged: "No defective or damaged cells/batteries are included.",
+  secured_against_movement: "Contents are secured against movement in the outer packaging.",
+  prevent_accidental_activation: "Equipment is packed to prevent accidental activation.",
+  uk_firearms_compliance: "Item complies with UK firearms law and applicable controls.",
+  not_post_office_counter: "Bladed item is not being posted over a Post Office counter.",
+  sift_proof_container: "A sift-proof container is used where required.",
+  leakproof_inner_and_outer: "Leakproof inner liner and leakproof outer packaging are used.",
+  sample_kit_used: "Official sample return kit is used where required.",
+  pi650_packaging: "Packaging Instruction 650 requirements are met.",
+  exempt_specimen_marking: "Package carries required exempt specimen wording.",
+  no_risk_to_handlers: "Sharp points/edges are fully protected and cannot pierce packaging.",
+  unopened_retail_batteries: "Batteries are new and unopened in original retail packaging.",
+  package_marked_spa67_sp238: "Package is marked NOT RESTRICTED and SPA67 / SP238.",
+  no_leakage_or_tainting: "Packaging is sealed to prevent leakage or tainting.",
+  perishable_label_applied: "Package is clearly labelled PERISHABLE.",
+  live_species_permitted: "Species is permitted under Royal Mail live-creature guidance.",
+  live_packaging_compliant: "Live-creature packaging requirements are met.",
+  no_fish_or_fry: "Item does not include fish or fish fry.",
+  toxic_medicine_packaging: "Inner packs and outer packaging meet medicine packaging rules.",
+  non_toxic_medicine_packaging: "Inner packs and outer packaging meet non-toxic medicine rules.",
+  soils_only_if_analysis: "Only analysis samples are sent where applicable."
+};
+
 // ROYAL MAIL DANGEROUS GOODS FILTER (from RM leaflet valid from May 2025)
 const RM_FILTER = [
-  { key:"rm_aerosol_toiletry", label:"Toiletry/medicinal aerosols", icon:"air", uk:true, intl:false,
-    details:"Allowed UK only with restrictions: max 500ml per item, max two items per parcel, counter presentation, sender name and address visible." },
-  { key:"rm_alcohol_24_70", label:"Alcohol 24% to 70% ABV", icon:"liquor", uk:true, intl:false,
-    details:"Allowed UK only with restrictions: max 1 litre per item, max two items per parcel, wrapped and cushioned, counter presentation." },
-  { key:"rm_alcohol_upto24", label:"Alcohol up to 24% ABV", icon:"wine_bar", uk:true, intl:true,
-    details:"Allowed UK and International with restrictions: max 1 litre per item, wrapped and cushioned, mark FRAGILE when glass." },
-  { key:"rm_perfume", label:"Perfume / aftershave", icon:"spa", uk:true, intl:false,
-    details:"Allowed UK only with restrictions: max 150ml per item, max four items per parcel, original retail packaging, counter presentation." },
-  { key:"rm_nail_varnish", label:"Nail varnish / polish / gel", icon:"brush", uk:true, intl:false,
-    details:"Allowed UK only with restrictions: max 30ml per item, max four items per parcel, strong outer packaging, counter presentation." },
-  { key:"rm_lithium_connected", label:"Device with connected lithium battery", icon:"battery_alert", uk:true, intl:true,
-    details:"Allowed UK and International with restrictions. Battery limits apply and item must be packed to prevent accidental activation." },
-  { key:"rm_lithium_not_connected", label:"Lithium batteries not connected", icon:"battery_unknown", uk:true, intl:false,
-    details:"Allowed UK only with restrictions. Applies where batteries are sent with a device but not connected." },
-  { key:"rm_sharp_pointed", label:"Sharp or pointed items", icon:"content_cut", uk:true, intl:true,
-    details:"Allowed UK and International if safely packaged so points and edges cannot pierce packaging." },
-  { key:"rm_prescription_non_toxic", label:"Prescription medicine (non-toxic/non-flammable)", icon:"medication", uk:true, intl:true,
-    details:"Allowed UK and International with quantity and packaging limits." },
+  { key:"rm_aerosols_toiletry_medicinal", label:"Aerosols (toiletry/medicinal)", icon:"air", uk:true, intl:false,
+    details:"Allowed UK only. Max 500ml per item and 2 items per parcel. Counter presentation and sender details required.",
+    checks:["valves_protected","tightly_packed","counter_presentation","sender_details_visible"],
+    limits:[
+      { id:"volume_per_item_ml", label:"Volume per item", max:500, min:0.1, unit:"ml" },
+      { id:"items_per_parcel", label:"Items in parcel", max:2, min:1, unit:"items" }
+    ] },
+  { key:"rm_bladed_items", label:"Bladed items", icon:"content_cut", uk:true, intl:false,
+    details:"Allowed UK only with restrictions. Cannot be sent via Post Office counter.",
+    checks:["not_post_office_counter"], limits:[] },
+  { key:"rm_flammable_liquids", label:"Flammable liquids", icon:"local_fire_department", uk:false, intl:false,
+    details:"Not allowed UK or International.", checks:[], limits:[] },
+  { key:"rm_flammable_solids", label:"Flammable solids", icon:"local_fire_department", uk:false, intl:false,
+    details:"Not allowed UK or International.", checks:[], limits:[] },
+  { key:"rm_aerosols_other", label:"Aerosols (other purpose)", icon:"block", uk:false, intl:false,
+    details:"Not allowed UK or International (for example spray paints/air fresheners).", checks:[], limits:[] },
+  { key:"rm_clinical_medical_waste", label:"Clinical/medical waste", icon:"warning", uk:false, intl:false,
+    details:"Not allowed UK or International.", checks:[], limits:[] },
+  { key:"rm_alcohol_over_70", label:"Alcohol over 70% ABV", icon:"local_bar", uk:false, intl:false,
+    details:"Not allowed UK or International.", checks:[], limits:[] },
+  { key:"rm_controlled_drugs", label:"Controlled drugs/narcotics", icon:"gavel", uk:false, intl:false,
+    details:"Not allowed UK or International.", checks:[], limits:[] },
+  { key:"rm_gases", label:"Gases/cylinders", icon:"warning", uk:false, intl:false,
+    details:"Not allowed UK or International (includes refills, extinguishers, scuba tanks).", checks:[], limits:[] },
+  { key:"rm_alcohol_24_to_70", label:"Alcohol 24% to 70% ABV", icon:"liquor", uk:true, intl:false,
+    details:"Allowed UK only. Max 1L per item and 2 items per parcel with wrapping/cushioning. Counter presentation required.",
+    checks:["wrapped_polythene_taped","absorbent_and_cushioned","fragile_if_glass","counter_presentation","sender_details_visible"],
+    limits:[
+      { id:"volume_per_item_l", label:"Volume per item", max:1, min:0.1, unit:"litres" },
+      { id:"items_per_parcel", label:"Items in parcel", max:2, min:1, unit:"items" }
+    ] },
+  { key:"rm_corrosives", label:"Corrosives", icon:"warning", uk:false, intl:false,
+    details:"Not allowed UK or International.", checks:[], limits:[] },
+  { key:"rm_device_lithium_not_connected", label:"Device with lithium batteries (not connected)", icon:"battery_alert", uk:true, intl:false,
+    details:"Allowed UK only with strict lithium limits and packaging controls.",
+    checks:["counter_presentation","sender_details_visible","short_circuit_protected","un38_3_compliant","batteries_not_damaged","secured_against_movement","prevent_accidental_activation","strong_outer_packaging"],
+    limits:[
+      { id:"spare_batteries", label:"Spare batteries in parcel", max:2, min:0, unit:"spares" },
+      { id:"wh_per_cell", label:"Watt-hour per cell", max:20, min:0, unit:"Wh" },
+      { id:"wh_per_battery", label:"Watt-hour per battery", max:100, min:0, unit:"Wh" },
+      { id:"lithium_g_per_cell", label:"Lithium content per cell", max:1, min:0, unit:"grams" },
+      { id:"lithium_g_per_battery", label:"Lithium content per battery", max:2, min:0, unit:"grams" },
+      { id:"net_battery_kg", label:"Net battery mass per parcel", max:5, min:0.01, unit:"kg" }
+    ] },
+  { key:"rm_guns_sporting_use", label:"Guns for sporting use", icon:"gpp_bad", uk:true, intl:false,
+    details:"Allowed UK only in compliance with law and controls. Sender details required.",
+    checks:["uk_firearms_compliance","sender_details_visible"], limits:[] },
+  { key:"rm_alcohol_up_to_24", label:"Alcohol up to 24% ABV", icon:"wine_bar", uk:true, intl:true,
+    details:"Allowed UK and International. Max 1L per item with protective packaging.",
+    checks:["wrapped_polythene_taped","absorbent_and_cushioned","fragile_if_glass"],
+    limits:[
+      { id:"volume_per_item_l", label:"Volume per item", max:1, min:0.1, unit:"litres" }
+    ] },
+  { key:"rm_ammunition", label:"Ammunition", icon:"block", uk:false, intl:false,
+    details:"Not allowed UK or International.", checks:[], limits:[] },
+  { key:"rm_batteries_dangerous_used", label:"Dangerous/used batteries", icon:"battery_alert", uk:false, intl:false,
+    details:"Not allowed UK or International (includes car batteries, damaged batteries, power banks).", checks:[], limits:[] },
+  { key:"rm_human_animal_ashes", label:"Human/animal ashes", icon:"public", uk:true, intl:true,
+    details:"Allowed on Royal Mail services with sift-proof containment and sender details.",
+    checks:["sift_proof_container","strong_outer_packaging","sender_details_visible"],
+    limits:[
+      { id:"ashes_weight_g", label:"Ashes per item", max:50, min:0.1, unit:"grams" }
+    ] },
+  { key:"rm_lighters_refills", label:"Lighters/refills (flammable)", icon:"block", uk:false, intl:false,
+    details:"Not allowed UK or International.", checks:[], limits:[] },
+  { key:"rm_new_consumer_batteries", label:"New alkaline/NiMH/NiCd batteries", icon:"battery_charging_full", uk:true, intl:true,
+    details:"Allowed UK and International when new/unopened in original retail packaging with cushioning.",
+    checks:["unopened_retail_batteries","absorbent_and_cushioned"], limits:[] },
+  { key:"rm_lithium_not_with_device", label:"Lithium batteries not with device", icon:"battery_alert", uk:false, intl:false,
+    details:"Not allowed UK or International (includes power banks).", checks:[], limits:[] },
+  { key:"rm_device_lithium_connected", label:"Device with connected lithium battery", icon:"battery_charging_full", uk:true, intl:true,
+    details:"Allowed UK and International with strict lithium limits and protective packaging.",
+    checks:["counter_presentation","sender_details_visible","un38_3_compliant","batteries_not_damaged","secured_against_movement","prevent_accidental_activation","strong_outer_packaging"],
+    limits:[
+      { id:"installed_cells", label:"Installed cells in parcel", max:4, min:0, unit:"cells" },
+      { id:"installed_batteries", label:"Installed batteries in parcel", max:2, min:0, unit:"batteries" },
+      { id:"wh_per_cell", label:"Watt-hour per cell", max:20, min:0, unit:"Wh" },
+      { id:"wh_per_battery", label:"Watt-hour per battery", max:100, min:0, unit:"Wh" },
+      { id:"lithium_g_per_cell", label:"Lithium content per cell", max:1, min:0, unit:"grams" },
+      { id:"lithium_g_per_battery", label:"Lithium content per battery", max:2, min:0, unit:"grams" },
+      { id:"net_battery_kg", label:"Net battery mass per parcel", max:5, min:0.01, unit:"kg" }
+    ],
+    limitAnyOf:["installed_cells","installed_batteries"],
+    limitAnyOfLabel:"Enter either installed cells or installed batteries above zero." },
+  { key:"rm_liquids_over_1l", label:"Liquids over 1 litre (non-DG)", icon:"water_drop", uk:true, intl:false,
+    details:"Allowed UK only with leakproof inner/outer packaging and FRAGILE marking for glass.",
+    checks:["leakproof_inner_and_outer","fragile_if_glass"],
+    limits:[
+      { id:"container_volume_l", label:"Volume per container", max:5, min:1.01, unit:"litres" }
+    ] },
+  { key:"rm_liquids_under_1l", label:"Liquids under 1 litre (non-DG)", icon:"water_drop", uk:true, intl:true,
+    details:"Allowed UK and International with leakproof inner/outer packaging and FRAGILE marking for glass.",
+    checks:["leakproof_inner_and_outer","fragile_if_glass"],
+    limits:[
+      { id:"container_volume_l", label:"Volume per container", max:1, min:0.01, unit:"litres" }
+    ] },
+  { key:"rm_wet_non_spillable_battery", label:"New wet non-spillable battery", icon:"battery_charging_full", uk:true, intl:false,
+    details:"Allowed UK only. Max one battery per parcel and max 1.5kg.",
+    checks:["short_circuit_protected","strong_outer_packaging","package_marked_spa67_sp238"],
+    limits:[
+      { id:"batteries_per_parcel", label:"Batteries per parcel", max:1, min:1, unit:"battery" },
+      { id:"battery_weight_kg", label:"Battery weight", max:1.5, min:0.01, unit:"kg" }
+    ] },
+  { key:"rm_environmentally_hazardous", label:"Environmentally hazardous substances", icon:"science", uk:true, intl:false,
+    details:"Allowed UK only with leakproof/sift-proof inner packaging and rigid outer protection.",
+    checks:["leakproof_inner_and_outer","strong_outer_packaging"],
+    limits:[
+      { id:"sample_total_l_kg", label:"Total sample quantity", max:5, min:0.01, unit:"L/kg" }
+    ] },
+  { key:"rm_biological_substance_cat_b", label:"Biological substances (Category B)", icon:"science", uk:true, intl:false,
+    details:"Allowed UK only. Max 50ml/50g total and PI650-compliant packaging.",
+    checks:["pi650_packaging"],
+    limits:[
+      { id:"sample_total_ml_g", label:"Total sample quantity", max:50, min:0.01, unit:"ml/g" }
+    ] },
+  { key:"rm_environmental_waste", label:"Environmental waste", icon:"block", uk:false, intl:false,
+    details:"Not allowed UK or International (for example used batteries/oil).", checks:[], limits:[] },
+  { key:"rm_explosives", label:"Explosives/fireworks/flares", icon:"block", uk:false, intl:false,
+    details:"Not allowed UK or International.", checks:[], limits:[] },
+  { key:"rm_live_creatures", label:"Live creatures/insects/invertebrates", icon:"pets", uk:true, intl:false,
+    details:"Allowed UK only with restrictions. Prohibited from Great Britain to Northern Ireland.",
+    checks:["live_species_permitted","live_packaging_compliant","no_fish_or_fry"], limits:[],
+    niRule:"live_creatures_forbidden" },
+  { key:"rm_magnetised_material", label:"Magnetised material", icon:"warning", uk:false, intl:false,
+    details:"Not allowed UK or International.", checks:[], limits:[] },
+  { key:"rm_matches", label:"Matches", icon:"block", uk:false, intl:false,
+    details:"Not allowed UK or International.", checks:[], limits:[] },
+  { key:"rm_nail_varnish", label:"Nail varnish/polish/gel", icon:"brush", uk:true, intl:false,
+    details:"Allowed UK only. Max 30ml per item and 4 items per parcel. Counter presentation and sender details required.",
+    checks:["strong_outer_packaging","absorbent_and_cushioned","counter_presentation","sender_details_visible"],
+    limits:[
+      { id:"volume_per_item_ml", label:"Volume per item", max:30, min:0.1, unit:"ml" },
+      { id:"items_per_parcel", label:"Items in parcel", max:4, min:1, unit:"items" }
+    ] },
+  { key:"rm_oxidising_peroxides", label:"Oxidising materials/peroxides", icon:"warning", uk:false, intl:false,
+    details:"Not allowed UK or International.", checks:[], limits:[] },
+  { key:"rm_patient_specimens", label:"Patient specimens", icon:"science", uk:true, intl:false,
+    details:"Allowed UK only at medical/lab request with approved kit and required markings.",
+    checks:["sample_kit_used","exempt_specimen_marking","strong_outer_packaging"],
+    limits:[
+      { id:"sample_total_ml_g", label:"Total sample quantity", max:250, min:0.01, unit:"ml/g" }
+    ] },
+  { key:"rm_perfume_aftershave", label:"Perfume/aftershave", icon:"spa", uk:true, intl:false,
+    details:"Allowed UK only. Max 150ml per item and 4 items per parcel in original retail packaging.",
+    checks:["original_retail_packaging","strong_outer_packaging","absorbent_and_cushioned","counter_presentation","sender_details_visible"],
+    limits:[
+      { id:"volume_per_item_ml", label:"Volume per item", max:150, min:0.1, unit:"ml" },
+      { id:"items_per_parcel", label:"Items in parcel", max:4, min:1, unit:"items" }
+    ] },
   { key:"rm_perishables", label:"Perishables", icon:"eco", uk:true, intl:false,
-    details:"Royal Mail allows UK only. Additional prohibitions apply for certain NI movements." },
-  { key:"rm_batteries_dangerous_used", label:"Dangerous/used batteries", icon:"battery_0_bar", uk:false, intl:false,
-    details:"Not allowed UK or International (includes car batteries, solo lithium batteries, power banks, and damaged batteries)." },
-  { key:"rm_flammables_explosives", label:"Flammables / explosives", icon:"local_fire_department", uk:false, intl:false,
-    details:"Not allowed UK or International (includes flammable liquids/solids, spray paints, fireworks, matches, solvent paints)." },
+    details:"Allowed UK only with packaging controls. Additional prohibitions/requirements apply on Great Britain to Northern Ireland routes.",
+    checks:["no_leakage_or_tainting","perishable_label_applied"], limits:[],
+    niRule:"perishable_extra" },
+  { key:"rm_pesticides", label:"Pesticides", icon:"pest_control", uk:false, intl:false,
+    details:"Not allowed UK or International.", checks:[], limits:[] },
+  { key:"rm_poisons_toxic", label:"Poisons/toxic substances", icon:"dangerous", uk:false, intl:false,
+    details:"Not allowed UK or International.", checks:[], limits:[] },
+  { key:"rm_prescription_toxic_flammable", label:"Prescription medicines (toxic/flammable)", icon:"medication", uk:true, intl:false,
+    details:"Allowed UK only with strict packaging and max 500ml/500g net quantity per parcel.",
+    checks:["toxic_medicine_packaging","sender_details_visible","strong_outer_packaging"],
+    limits:[
+      { id:"net_quantity_ml_g", label:"Net quantity per parcel", max:500, min:0.01, unit:"ml/g" }
+    ] },
+  { key:"rm_prescription_non_toxic", label:"Prescription medicines (non-toxic/non-flammable)", icon:"medication", uk:true, intl:true,
+    details:"Allowed UK and International with strict packaging and max 1 litre/1kg net quantity per parcel.",
+    checks:["non_toxic_medicine_packaging","sender_details_visible","strong_outer_packaging"],
+    limits:[
+      { id:"net_quantity_l_kg", label:"Net quantity per parcel", max:1, min:0.01, unit:"L/kg" }
+    ] },
+  { key:"rm_radioactive_materials", label:"Radioactive materials/samples", icon:"dangerous", uk:false, intl:false,
+    details:"Not allowed UK or International.", checks:[], limits:[] },
+  { key:"rm_sharp_pointed_items", label:"Sharp/pointed items", icon:"content_cut", uk:true, intl:true,
+    details:"Allowed UK and International when points/edges are fully protected and cannot pierce packaging.",
+    checks:["no_risk_to_handlers","strong_outer_packaging"], limits:[] },
+  { key:"rm_solvent_paints_varnish", label:"Solvent paints/varnish/enamels", icon:"block", uk:false, intl:false,
+    details:"Not allowed UK or International.", checks:[], limits:[] },
+  { key:"rm_waste_dirt_filth", label:"Waste/dirt/filth/refuse", icon:"block", uk:false, intl:false,
+    details:"Not allowed UK or International. Soil samples are only allowed for analysis when leaks are contained.",
+    checks:["soils_only_if_analysis"], limits:[] },
   { key:"rm_weapons", label:"Weapons", icon:"gpp_bad", uk:false, intl:false,
-    details:"Not allowed UK or International." },
-  { key:"rm_gases", label:"Gases and cylinders", icon:"propane_tank", uk:false, intl:false,
-    details:"Not allowed UK or International (includes gas canisters, refills, fire extinguishers, scuba tanks)." },
-  { key:"rm_poisons_radioactive", label:"Poisons / radioactive", icon:"warning", uk:false, intl:false,
-    details:"Not allowed UK or International." },
-];
-
-const RM_ADVISORY = [
-  { key:"rmc_counter", label:"Counter presentation required", icon:"storefront",
-    details:"Certain restricted items (for example aerosols, perfumes, and nail products) must be presented at the Post Office counter." },
-  { key:"rmc_sender_details", label:"Sender details required", icon:"badge",
-    details:"Sender name and return address must be clearly visible on parcels for certain restricted dangerous goods." },
-  { key:"rmc_quantity_limits", label:"Quantity limits apply", icon:"rule",
-    details:"Royal Mail applies per-item and per-parcel limits for many restricted items. Check limits before acceptance." },
-  { key:"rmc_packaging", label:"Specific packaging required", icon:"inventory_2",
-    details:"Restricted items must be tightly packed in strong outer packaging with leak/sift protection where applicable." },
-  { key:"rmc_battery_limits", label:"Lithium battery limits", icon:"battery_charging_full",
-    details:"Lithium cells and batteries must meet Wh/g limits, be protected from short-circuit, and be secured against movement." },
-  { key:"rmc_country_rules", label:"Destination rules vary", icon:"public",
-    details:"Some categories are UK-only. International acceptance depends on destination and current Royal Mail rules." },
+    details:"Not allowed UK or International.", checks:[], limits:[] },
 ];
 
 // COVER LIMITS: Loss-only (refund if lost, not damage)
@@ -566,6 +764,144 @@ function isBTPostcode(value){
   return /^BT/i.test((value || "").trim());
 }
 
+function isGBToNIJourney(){
+  return state.destination === "uk"
+    && isBTPostcode(state.recipientPostcode)
+    && !!state.senderPostcode
+    && !isBTPostcode(state.senderPostcode);
+}
+
+function currentRMRule(){
+  return RM_FILTER.find(x => x.key === state.rmSelectedKey) || null;
+}
+
+function rmRuleAllowed(rule){
+  if(!rule) return false;
+  return state.destination === "uk" ? !!rule.uk : !!rule.intl;
+}
+
+function rmRuleRequirements(rule){
+  if(!rule) return { checks: [], limits: [], limitAnyOf: [], limitAnyOfLabel: "" };
+  const checks = (rule.checks || []).map(id => ({
+    id,
+    label: RM_CHECK_LABELS[id] || id
+  }));
+  const limits = (rule.limits || []).map(limit => ({
+    id: limit.id,
+    label: limit.label,
+    max: limit.max,
+    min: limit.min ?? 0,
+    unit: limit.unit || "",
+    step: limit.step || "any"
+  }));
+  return {
+    checks,
+    limits,
+    limitAnyOf: rule.limitAnyOf || [],
+    limitAnyOfLabel: rule.limitAnyOfLabel || ""
+  };
+}
+
+function resetRMConditionCapture(){
+  state.rmConditionChecks = {};
+  state.rmConditionValues = {};
+  state.rmConditionSatisfied = false;
+}
+
+function applyQuickDemoRMConditionCapture(rule){
+  const requirements = rmRuleRequirements(rule);
+  requirements.checks.forEach(check => {
+    state.rmConditionChecks[check.id] = true;
+  });
+  requirements.limits.forEach(limit => {
+    const min = Number(limit.min ?? 0);
+    const max = Number(limit.max ?? 1);
+    let auto = min > 0 ? min : 1;
+    if(auto > max) auto = max;
+    state.rmConditionValues[limit.id] = String(auto);
+  });
+  if(requirements.limitAnyOf.length){
+    const key = requirements.limitAnyOf[0];
+    if(!state.rmConditionValues[key] || Number.parseFloat(state.rmConditionValues[key]) <= 0){
+      state.rmConditionValues[key] = "1";
+    }
+  }
+}
+
+function validateRMConditionCapture(rule){
+  const requirements = rmRuleRequirements(rule);
+  const problems = [];
+
+  requirements.checks.forEach(check => {
+    if(!state.rmConditionChecks[check.id]){
+      problems.push(`Confirm: ${check.label}`);
+    }
+  });
+
+  requirements.limits.forEach(limit => {
+    const raw = (state.rmConditionValues[limit.id] || "").trim();
+    const value = Number.parseFloat(raw);
+    if(raw === "" || !Number.isFinite(value)){
+      problems.push(`Enter ${limit.label}`);
+      return;
+    }
+    if(value < limit.min || value > limit.max){
+      problems.push(`${limit.label} must be ${limit.min} to ${limit.max}${limit.unit ? ` ${limit.unit}` : ""}`);
+    }
+  });
+
+  if(requirements.limitAnyOf.length){
+    const anyOk = requirements.limitAnyOf.some(limitId => {
+      const raw = (state.rmConditionValues[limitId] || "").trim();
+      const value = Number.parseFloat(raw);
+      return Number.isFinite(value) && value > 0;
+    });
+    if(!anyOk){
+      problems.push(requirements.limitAnyOfLabel || "Complete at least one required quantity field.");
+    }
+  }
+
+  return problems;
+}
+
+function rmNIStatus(){
+  const rule = currentRMRule();
+  if(!rule) return { ok: true, blocked: false, message: "" };
+  if(!isGBToNIJourney()) return { ok: true, blocked: false, message: "" };
+
+  if(rule.niRule === "live_creatures_forbidden"){
+    return {
+      ok: false,
+      blocked: true,
+      message: "Live creatures/insects are prohibited from Great Britain to Northern Ireland."
+    };
+  }
+
+  if(rule.niRule === "perishable_extra"){
+    if(state.niSpsCategory !== "yes" && state.niSpsCategory !== "no"){
+      return { ok: false, blocked: false, message: "Select whether SPS goods are included for this GB to NI journey." };
+    }
+    if(state.niSpsCategory === "no"){
+      return { ok: true, blocked: false, message: "" };
+    }
+    if(!state.rmNiPerishableRoute){
+      return { ok: false, blocked: false, message: "Select the perishable content route for Great Britain to Northern Ireland." };
+    }
+    if(state.rmNiPerishableRoute === "contains_prohibited"){
+      return {
+        ok: false,
+        blocked: true,
+        message: "Perishables containing meat, dairy, or pet food are prohibited on this Great Britain to Northern Ireland route."
+      };
+    }
+    if(state.rmNiPerishableRoute === "plants_certified" && !state.rmNiPlantCertRef.trim()){
+      return { ok: false, blocked: false, message: "Enter the plant/flower certification reference." };
+    }
+  }
+
+  return { ok: true, blocked: false, message: "" };
+}
+
 function numericValue(value){
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -617,6 +953,18 @@ function applyQuickDemoDefaults(){
     state.rmSelectedKey = "rm_other_not_listed";
     state.rmOtherSelected = true;
     state.rmBlockedKey = null;
+    state.rmConditionSatisfied = true;
+  }
+  if(state.rmSelectedKey && state.rmSelectedKey !== "rm_other_not_listed"){
+    const rule = currentRMRule();
+    if(rule && rmRuleAllowed(rule)){
+      if(!state.rmConditionSatisfied){
+        applyQuickDemoRMConditionCapture(rule);
+        state.rmConditionSatisfied = validateRMConditionCapture(rule).length === 0;
+      }
+      state.rmBlockedKey = null;
+      state.rmOtherSelected = false;
+    }
   }
 
   if(state.format && !state.formatConfirmed) state.formatConfirmed = true;
@@ -631,6 +979,8 @@ function applyQuickDemoDefaults(){
     if(!state.niCustomsReference) state.niCustomsReference = "NI-EXAMPLE-001";
     if(!state.niSpsCategory) state.niSpsCategory = "no";
     if(!state.niPrivateIndividual) state.niPrivateIndividual = "yes";
+    if(!state.rmNiPerishableRoute) state.rmNiPerishableRoute = "confectionery_only";
+    if(!state.rmNiPlantCertRef) state.rmNiPlantCertRef = "NI-CERT-001";
     state.niCustomsConfirmed = true;
   }
   state.proofOfDelivery = true;
@@ -773,9 +1123,12 @@ function renderWeigh(){
       state.niCustomsReference = "";
       state.niSpsCategory = "";
       state.niPrivateIndividual = "";
+      state.rmNiPerishableRoute = "";
+      state.rmNiPlantCertRef = "";
       state.rmSelectedKey = null;
       state.rmBlockedKey = null;
       state.rmOtherSelected = false;
+      resetRMConditionCapture();
       state.evriAdditionalSelection = "";
       state.evriAdditionalBlocked = false;
       state.evriScreeningComplete = false;
@@ -857,11 +1210,9 @@ function renderRMDangerous(){
     details:"Select this if your item does not match any listed category."
   };
   const rmOrdered = [...RM_FILTER];
-  // Keep "Other / not listed" fixed at bottom-right (row 5, col 5) for fast-path selection.
-  if(rmOrdered.length > 24){
-    rmOrdered.length = 24;
-  }
-  while(rmOrdered.length < 24){
+  // Keep "Other / not listed" fixed at bottom-right of the visible RM category area.
+  const activeSlots = Math.ceil((rmOrdered.length + 1) / 5) * 5;
+  while(rmOrdered.length < activeSlots - 1){
     rmOrdered.push({ key:`_rm_gap_${rmOrdered.length}`, label:"", icon:"block", details:"", blank:true });
   }
   rmOrdered.push(otherItem);
@@ -872,7 +1223,7 @@ function renderRMDangerous(){
     <div class="stepHeader">
       <div>
         <h1>Screen for Dangerous Goods (KIOSK-410)</h1>
-        <p class="subtitle"><strong>Including Prohibited or Restricted items.</strong> Rules shown for ${isUK ? "UK" : "International"} destination.</p>
+        <p class="subtitle"><strong>Does your item contain any of the following?</strong> RM rules shown for ${isUK ? "UK" : "International"} destination.</p>
       </div>
       <span class="pill"><span class="material-symbols-outlined">local_shipping</span> Dangerous goods screen</span>
     </div>
@@ -886,13 +1237,19 @@ function renderRMDangerous(){
           <button class="btn" id="rmClose"><span class="material-symbols-outlined">close</span>Close</button>
         </div>
         <div class="detailsText" id="rmDetailsText"></div>
+        <div id="rmConditionInputs"></div>
         <div class="banner" id="rmStatusBanner"></div>
+        <div class="rmConditionActions" id="rmConditionActions"></div>
       </div>
     </div>
   `;
 
   const grid = document.getElementById("rmGrid");
   list.forEach(item => grid.appendChild(tileEl(item, "rm")));
+  if(state.rmSelectedKey){
+    const selected = document.querySelector(`.tile[data-mode="rm"][data-key="${state.rmSelectedKey}"]`);
+    if(selected) selected.classList.add("selected");
+  }
   wireRMDangerousDetails(list);
 }
 
@@ -900,9 +1257,121 @@ function wireRMDangerousDetails(list){
   const details = document.getElementById("rmDetails");
   const title = document.getElementById("rmDetailsTitle");
   const text = document.getElementById("rmDetailsText");
+  const inputs = document.getElementById("rmConditionInputs");
   const banner = document.getElementById("rmStatusBanner");
+  const actions = document.getElementById("rmConditionActions");
   const close = document.getElementById("rmClose");
-  const isUK = state.destination === "uk";
+
+  function clearDetailsPanel(){
+    details.classList.remove("show");
+    text.textContent = "";
+    inputs.innerHTML = "";
+    actions.innerHTML = "";
+    banner.className = "banner";
+  }
+
+  function showBlocked(item){
+    title.innerHTML = `
+      <div class="icon"><span class="material-symbols-outlined">${item.icon || "block"}</span></div>
+      ${escapeHtml(item.label)}
+    `;
+    text.textContent = item.details || "";
+    inputs.innerHTML = "";
+    actions.innerHTML = "";
+    banner.className = "banner danger show";
+    banner.textContent = "Not allowed for this destination under Royal Mail dangerous goods rules.";
+    details.classList.add("show");
+  }
+
+  function showConditionCapture(item){
+    const requirements = rmRuleRequirements(item);
+    requirements.checks.forEach(check => {
+      if(typeof state.rmConditionChecks[check.id] !== "boolean"){
+        state.rmConditionChecks[check.id] = false;
+      }
+    });
+    requirements.limits.forEach(limit => {
+      if(typeof state.rmConditionValues[limit.id] === "undefined"){
+        state.rmConditionValues[limit.id] = "";
+      }
+    });
+
+    title.innerHTML = `
+      <div class="icon"><span class="material-symbols-outlined">${item.icon || "block"}</span></div>
+      ${escapeHtml(item.label)}
+    `;
+    text.textContent = item.details || "";
+
+    const checksHtml = requirements.checks.length ? `
+      <div class="rmConditionGroup">
+        <strong>Required checks</strong>
+        ${requirements.checks.map(check => `
+          <label class="rmConditionCheck">
+            <input type="checkbox" data-rm-check="${check.id}" ${state.rmConditionChecks[check.id] ? "checked" : ""}/>
+            <span>${escapeHtml(check.label)}</span>
+          </label>
+        `).join("")}
+      </div>
+    ` : "";
+
+    const limitsHtml = requirements.limits.length ? `
+      <div class="rmConditionGroup">
+        <strong>Quantity and limit checks</strong>
+        ${requirements.limits.map(limit => `
+          <label class="rmConditionLimit">
+            <span>${escapeHtml(limit.label)} (${escapeHtml(String(limit.min))} to ${escapeHtml(String(limit.max))}${limit.unit ? ` ${escapeHtml(limit.unit)}` : ""})</span>
+            <input type="text" inputmode="decimal" data-rm-limit="${limit.id}" value="${escapeHtml(state.rmConditionValues[limit.id] || "")}" />
+          </label>
+        `).join("")}
+      </div>
+    ` : "";
+
+    inputs.innerHTML = checksHtml + limitsHtml;
+
+    banner.className = "banner warn show";
+    banner.textContent = "Complete all mandatory checks/limits to continue with this restricted category.";
+
+    actions.innerHTML = `
+      <button class="btn primary" id="rmConfirmConditions">
+        <span class="material-symbols-outlined">task_alt</span>Confirm conditions and continue
+      </button>
+    `;
+
+    inputs.querySelectorAll("[data-rm-check]").forEach(input => {
+      input.addEventListener("change", (e) => {
+        const checkId = e.target.getAttribute("data-rm-check");
+        state.rmConditionChecks[checkId] = !!e.target.checked;
+        state.rmConditionSatisfied = false;
+      });
+    });
+
+    inputs.querySelectorAll("[data-rm-limit]").forEach(input => {
+      input.addEventListener("input", (e) => {
+        const limitId = e.target.getAttribute("data-rm-limit");
+        let raw = (e.target.value || "").replace(/[^0-9.]/g, "");
+        const firstDot = raw.indexOf(".");
+        if(firstDot !== -1){
+          raw = raw.slice(0, firstDot + 1) + raw.slice(firstDot + 1).replace(/\./g, "");
+        }
+        state.rmConditionValues[limitId] = raw.slice(0, 10);
+        e.target.value = state.rmConditionValues[limitId];
+        state.rmConditionSatisfied = false;
+      });
+    });
+
+    document.getElementById("rmConfirmConditions").addEventListener("click", ()=>{
+      const errors = validateRMConditionCapture(item);
+      if(errors.length){
+        alert(errors.slice(0, 5).join("\n"));
+        return;
+      }
+      state.rmConditionSatisfied = true;
+      state.step = 3;
+      render();
+    });
+
+    details.classList.add("show");
+  }
 
   document.querySelectorAll('.tile[data-mode="rm"]').forEach(btn=>{
     btn.addEventListener("click", ()=>{
@@ -914,47 +1383,59 @@ function wireRMDangerousDetails(list){
       btn.classList.add("selected");
 
       if(key === "rm_other_not_listed"){
+        resetRMConditionCapture();
         state.rmSelectedKey = key;
         state.rmBlockedKey = null;
         state.rmOtherSelected = true;
-        details.classList.remove("show");
+        state.rmConditionSatisfied = true;
+        clearDetailsPanel();
         state.step = 3;
         render();
         return;
       }
 
+      const changedSelection = state.rmSelectedKey !== key;
       state.rmSelectedKey = key;
       state.rmOtherSelected = false;
-      const allowed = isUK ? item.uk : item.intl;
+      if(changedSelection){
+        resetRMConditionCapture();
+      }
+
+      const allowed = rmRuleAllowed(item);
       state.rmBlockedKey = allowed ? null : key;
 
-      title.innerHTML = `
-        <div class="icon"><span class="material-symbols-outlined">${item.icon || "block"}</span></div>
-        ${escapeHtml(item.label)}
-      `;
-      text.textContent = item.details || "";
+      if(!allowed){
+        state.rmConditionSatisfied = false;
+        showBlocked(item);
+        return;
+      }
 
-      banner.className = "banner show";
-      if(allowed){
-        banner.classList.add((item.uk && item.intl) ? "ok" : "warn");
-        banner.textContent = (item.uk && item.intl)
-          ? "Allowed for this destination when Royal Mail packaging conditions are met."
-          : "Restricted: allowed only on specific destinations/services with conditions.";
-        // Single-tap flow: allowed selections move forward immediately.
+      const requirements = rmRuleRequirements(item);
+      const hasRequirements = requirements.checks.length > 0 || requirements.limits.length > 0;
+      if(!hasRequirements){
+        state.rmConditionSatisfied = true;
         state.step = 3;
         render();
         return;
-      } else {
-        banner.classList.add("danger");
-        banner.textContent = "Not allowed for this destination under Royal Mail dangerous goods rules.";
       }
 
-      details.classList.add("show");
+      if(state.quickDemoMode){
+        applyQuickDemoRMConditionCapture(item);
+        const quickDemoErrors = validateRMConditionCapture(item);
+        if(!quickDemoErrors.length){
+          state.rmConditionSatisfied = true;
+          state.step = 3;
+          render();
+          return;
+        }
+      }
+
+      showConditionCapture(item);
     });
   });
 
   close.addEventListener("click", ()=>{
-    details.classList.remove("show");
+    clearDetailsPanel();
     document.querySelectorAll('.tile[data-mode="rm"]').forEach(b=>b.classList.remove("selected"));
   });
 }
@@ -1165,6 +1646,10 @@ function renderCaptureItemDetails(){
 function renderFilterAndPresentOptions(){
   const services = availableServices();
   const showNI = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
+  const showGBToNI = isGBToNIJourney();
+  const selectedRMRule = currentRMRule();
+  const niStatus = rmNIStatus();
+  const showRMNISpecial = showGBToNI && selectedRMRule && !!selectedRMRule.niRule;
   const chosenService = selectedService();
   const needsEvriAdditional = !!(chosenService && chosenService.profile === "evri_dpd");
 
@@ -1181,6 +1666,12 @@ function renderFilterAndPresentOptions(){
       <div class="card">
         <h3>Service filtering (KIOSK-413 / KIOSK-415 / KIOSK-428)</h3>
         <div class="helpNote">Using speed preference: <strong>${escapeHtml(state.deliverySpeed)}</strong>. Services are pre-filtered by item data/restrictions and tracked services are prioritised.</div>
+        ${selectedRMRule ? `
+          <div class="helpNote" style="margin-top:10px;">
+            <strong>RM dangerous goods category:</strong> ${escapeHtml(selectedRMRule.label)}<br/>
+            ${state.rmConditionSatisfied ? "RM condition checks completed." : "RM condition checks pending."}
+          </div>
+        ` : ""}
 
         <h3 style="margin-top:14px;">Available services (KIOSK-414)</h3>
         <div class="choiceGroup" id="serviceChoices">
@@ -1224,6 +1715,44 @@ function renderFilterAndPresentOptions(){
             <input type="checkbox" id="niConfirmed" ${state.niCustomsConfirmed ? "checked" : ""}/>
             <span>I confirm NI/Windsor information has been captured and validated.</span>
           </label>
+
+          ${showRMNISpecial && selectedRMRule.niRule === "live_creatures_forbidden" ? `
+            <div class="banner danger show" style="display:block; margin-top:10px;">
+              ${escapeHtml(niStatus.message || "This selected Royal Mail category is blocked for Great Britain to Northern Ireland journeys.")}
+            </div>
+          ` : ""}
+
+          ${showRMNISpecial && selectedRMRule.niRule === "perishable_extra" ? `
+            <div class="helpNote" style="margin-top:10px;">
+              <strong>Additional RM perishable checks (GB to NI):</strong> confirm whether this is allowed content under Windsor rules.
+            </div>
+            ${state.niSpsCategory === "yes" ? `
+              <div class="choiceGroup" id="rmPerishableRouteChoices" style="margin-top:8px;">
+                <button type="button" class="choiceBtn ${state.rmNiPerishableRoute==="confectionery_only"?"active":""}" data-value="confectionery_only">
+                  <span>Confectionery only</span>
+                  <span class="sub">No meat/dairy/pet food</span>
+                </button>
+                <button type="button" class="choiceBtn ${state.rmNiPerishableRoute==="plants_certified"?"active":""}" data-value="plants_certified">
+                  <span>Flowers/plants with certification</span>
+                  <span class="sub">Certification required</span>
+                </button>
+                <button type="button" class="choiceBtn ${state.rmNiPerishableRoute==="contains_prohibited"?"active":""}" data-value="contains_prohibited">
+                  <span>Contains restricted meat/dairy/pet food</span>
+                  <span class="sub">Blocked</span>
+                </button>
+              </div>
+              ${state.rmNiPerishableRoute === "plants_certified" ? `
+                <input id="rmNiPlantCertRefInput" placeholder="Plant/flower certification reference" value="${escapeHtml(state.rmNiPlantCertRef)}" style="margin-top:8px;" />
+              ` : ""}
+            ` : `
+              <div class="helpNote" style="margin-top:8px;">SPS content is set to "No", so no additional RM perishable block is triggered.</div>
+            `}
+            ${niStatus.message ? `
+              <div class="banner ${niStatus.blocked ? "danger" : "warn"} show" style="display:block; margin-top:10px;">
+                ${escapeHtml(niStatus.message)}
+              </div>
+            ` : ""}
+          ` : ""}
         ` : ""}
 
         <label style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-weight:700;">
@@ -1284,21 +1813,45 @@ function renderFilterAndPresentOptions(){
 
   rp.addEventListener("input", (e)=>{
     const prevNI = isBTPostcode(state.recipientPostcode);
+    const prevGBToNI = isGBToNIJourney();
     state.recipientPostcode = (e.target.value || "").toUpperCase().slice(0, 10);
     e.target.value = state.recipientPostcode;
     const nowNI = isBTPostcode(state.recipientPostcode);
+    const nowGBToNI = isGBToNIJourney();
     if(prevNI !== nowNI){
       if(!nowNI){
         state.niCustomsReference = "";
         state.niCustomsConfirmed = false;
         state.niSpsCategory = "";
         state.niPrivateIndividual = "";
+        state.rmNiPerishableRoute = "";
+        state.rmNiPlantCertRef = "";
+      }
+      render();
+      return;
+    }
+    if(prevGBToNI !== nowGBToNI){
+      if(!nowGBToNI){
+        state.rmNiPerishableRoute = "";
+        state.rmNiPlantCertRef = "";
       }
       render();
     }
   });
   ra.addEventListener("input", (e)=>{ state.recipientAddress = (e.target.value || "").slice(0, 80); e.target.value = state.recipientAddress; });
-  sp.addEventListener("input", (e)=>{ state.senderPostcode = (e.target.value || "").toUpperCase().slice(0, 10); e.target.value = state.senderPostcode; });
+  sp.addEventListener("input", (e)=>{
+    const prevGBToNI = isGBToNIJourney();
+    state.senderPostcode = (e.target.value || "").toUpperCase().slice(0, 10);
+    e.target.value = state.senderPostcode;
+    const nowGBToNI = isGBToNIJourney();
+    if(prevGBToNI !== nowGBToNI){
+      if(!nowGBToNI){
+        state.rmNiPerishableRoute = "";
+        state.rmNiPlantCertRef = "";
+      }
+      render();
+    }
+  });
   sa.addEventListener("input", (e)=>{ state.senderAddress = (e.target.value || "").slice(0, 80); e.target.value = state.senderAddress; });
   pod.addEventListener("change", (e)=>{ state.proofOfDelivery = !!e.target.checked; });
 
@@ -1314,7 +1867,12 @@ function renderFilterAndPresentOptions(){
   niSpsChoices.forEach(btn=>{
     btn.addEventListener("click", ()=>{
       state.niSpsCategory = btn.dataset.value || "";
+      if(state.niSpsCategory !== "yes"){
+        state.rmNiPerishableRoute = "";
+        state.rmNiPlantCertRef = "";
+      }
       niSpsChoices.forEach(b=>b.classList.toggle("active", b===btn));
+      render();
     });
   });
   const niPrivateChoices = document.querySelectorAll("#niPrivateChoices .choiceBtn");
@@ -1324,6 +1882,25 @@ function renderFilterAndPresentOptions(){
       niPrivateChoices.forEach(b=>b.classList.toggle("active", b===btn));
     });
   });
+
+  const rmPerishableRouteChoices = document.querySelectorAll("#rmPerishableRouteChoices .choiceBtn");
+  rmPerishableRouteChoices.forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.rmNiPerishableRoute = btn.dataset.value || "";
+      if(state.rmNiPerishableRoute !== "plants_certified"){
+        state.rmNiPlantCertRef = "";
+      }
+      render();
+    });
+  });
+
+  const rmNiPlantCertRefInput = document.getElementById("rmNiPlantCertRefInput");
+  if(rmNiPlantCertRefInput){
+    rmNiPlantCertRefInput.addEventListener("input", (e)=>{
+      state.rmNiPlantCertRef = (e.target.value || "").slice(0, 40);
+      e.target.value = state.rmNiPlantCertRef;
+    });
+  }
 
   const evriChoices = document.querySelectorAll("#evriDangerousChoices .choiceBtn");
   evriChoices.forEach(btn=>{
@@ -1465,6 +2042,7 @@ function renderSummary(){
   const lossLabels = [...state.coverLossOnlyKeys].map(k => LOSS_ONLY.find(x=>x.key===k)?.label).filter(Boolean);
   const ncLabels = [...state.coverNoCompKeys].map(k => NO_COMP.find(x=>x.key===k)?.label).filter(Boolean);
   const rmSelected = RM_FILTER.find(x=>x.key===state.rmSelectedKey)?.label || (state.rmOtherSelected ? "Other / not listed" : "None");
+  const rmNi = rmNIStatus();
 
   screen.innerHTML = `
     <div class="stepHeader">
@@ -1514,6 +2092,8 @@ function renderSummary(){
         <div style="margin-top:10px;">
           <div class="helpNote">
             <strong>RM filter selection:</strong> ${escapeHtml(rmSelected)}<br/>
+            <strong>RM condition checks:</strong> ${state.rmOtherSelected ? "Not required (Other selected)" : (state.rmConditionSatisfied ? "Completed" : "Not completed")}<br/>
+            <strong>RM GB to NI status:</strong> ${rmNi.ok ? "Clear" : escapeHtml(rmNi.message || "Blocked or incomplete")}<br/>
             <strong>EVRi/DPD loss-only flag:</strong> ${state.evriLossOnlySelected ? "Yes" : "No"}<br/>
             <strong>EVRi/DPD no-comp flag:</strong> ${state.evriNoCompSelected ? "Yes" : "No"}<br/>
             <strong>Legacy restricted flags:</strong> ${restrictedLabels.length ? escapeHtml(restrictedLabels.join(", ")) : "None"} / ${lossLabels.length ? escapeHtml(lossLabels.join(", ")) : "None"} / ${ncLabels.length ? escapeHtml(ncLabels.join(", ")) : "None"}
@@ -1634,7 +2214,16 @@ function canContinue(){
   if(state.step === 1) return !!state.weightG && !!state.destination;
 
   if(state.step === 2){
-    return (state.rmOtherSelected || !!state.rmSelectedKey) && !state.rmBlockedKey;
+    if(state.rmBlockedKey) return false;
+    if(state.rmOtherSelected) return true;
+    if(!state.rmSelectedKey) return false;
+    const rule = currentRMRule();
+    if(!rule) return false;
+    const requirements = rmRuleRequirements(rule);
+    if(!requirements.checks.length && !requirements.limits.length){
+      return true;
+    }
+    return !!state.rmConditionSatisfied;
   }
 
   if(state.step === 3){
@@ -1646,8 +2235,9 @@ function canContinue(){
     const hasService = !!state.selectedServiceId;
     const needsNI = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
     const niOk = !needsNI || (!!state.niCustomsReference && !!state.niSpsCategory && !!state.niPrivateIndividual && state.niCustomsConfirmed);
+    const rmNiOk = rmNIStatus().ok;
     const evriOk = state.productProfile !== "evri_dpd" || (state.evriScreeningComplete && !state.evriAdditionalBlocked);
-    return hasAddresses && hasService && niOk && evriOk;
+    return hasAddresses && hasService && niOk && rmNiOk && evriOk;
   }
 
   if(state.step === 5){
@@ -1669,6 +2259,14 @@ function next(){
         alert("This item is not allowed for the selected destination under Royal Mail rules.");
         return;
       }
+      const rule = currentRMRule();
+      if(rule){
+        const requirements = rmRuleRequirements(rule);
+        if(requirements.checks.length || requirements.limits.length){
+          alert("Complete the Royal Mail category conditions before continuing.");
+          return;
+        }
+      }
       alert("Please select a Royal Mail category or choose 'Other / not listed'.");
       return;
     }
@@ -1679,6 +2277,11 @@ function next(){
     if(state.step === 4){
       if(state.productProfile === "evri_dpd" && state.evriAdditionalBlocked){
         alert("EVRi/DPD prohibited item selected. Choose a different service or clear the screening result.");
+        return;
+      }
+      const niStatus = rmNIStatus();
+      if(!niStatus.ok){
+        alert(niStatus.message || "Complete Northern Ireland checks for the selected Royal Mail category.");
         return;
       }
       alert("Complete address details, NI/Windsor checks (if applicable), select a service, and finish carrier-specific screening.");
@@ -1717,6 +2320,9 @@ function resetAll(){
   state.rmSelectedKey = null;
   state.rmBlockedKey = null;
   state.rmOtherSelected = false;
+  state.rmConditionChecks = {};
+  state.rmConditionValues = {};
+  state.rmConditionSatisfied = false;
   state.evriAdditionalSelection = "";
   state.evriAdditionalBlocked = false;
   state.evriScreeningComplete = false;
@@ -1738,6 +2344,8 @@ function resetAll(){
   state.niCustomsReference = "";
   state.niSpsCategory = "";
   state.niPrivateIndividual = "";
+  state.rmNiPerishableRoute = "";
+  state.rmNiPlantCertRef = "";
   state.proofOfDelivery = false;
   state.selectedServiceId = "";
   state.basketAdded = false;
