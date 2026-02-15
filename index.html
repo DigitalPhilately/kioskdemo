@@ -1072,7 +1072,7 @@ function renderCaptureItemDetails(){
       <span class="pill"><span class="material-symbols-outlined">inventory_2</span> Format sidecar</span>
     </div>
 
-    <div class="formRow">
+    <div class="formRow stack">
       <div class="card">
         <h3>Item offered to format sidecar</h3>
         <div style="margin-top:10px;">
@@ -1082,9 +1082,8 @@ function renderCaptureItemDetails(){
           <span class="tag"><span class="material-symbols-outlined">local_shipping</span> ${profile}</span>
         </div>
         <div class="helpNote">Kiosk will use format sidecar for classification confirmation.</div>
-      </div>
-      <div class="card">
-        <h3>Confirm format classification</h3>
+
+        <h3 style="margin-top:14px;">Confirm format classification (KIOSK-405)</h3>
         <div class="choiceRow3" id="captureFormatChoices">
           <button type="button" class="choiceBtn ${state.format==="letter"?"active":""}" data-value="letter"><span>Letter</span></button>
           <button type="button" class="choiceBtn ${state.format==="large_letter"?"active":""}" data-value="large_letter"><span>Large Letter</span></button>
@@ -1095,11 +1094,15 @@ function renderCaptureItemDetails(){
           <span>I confirm the sidecar classification is correct.</span>
         </label>
 
-        <h3 style="margin-top:14px;">Declare Item Value and Content (KIOSK-406)</h3>
-        <p style="margin:0 0 8px;color:var(--muted);font-size:13px;">Declare value (KIOSK-407)</p>
+        <h3 style="margin-top:14px;">Declare item value (KIOSK-407)</h3>
         <input id="declaredValueInput" inputmode="decimal" placeholder="e.g. 49.99" value="${escapeHtml(state.declaredValue)}" />
-        <p style="margin:10px 0 8px;color:var(--muted);font-size:13px;">Declare contents (KIOSK-408)</p>
-        <input id="contentDescInput" placeholder="e.g. Two paperback books" value="${escapeHtml(state.contentDescription)}" />
+
+        <h3 style="margin-top:14px;">Delivery speed preference (KIOSK-427)</h3>
+        <div class="choiceRow3" id="captureSpeedChoices">
+          <button type="button" class="choiceBtn ${state.deliverySpeed==="balanced"?"active":""}" data-value="balanced"><span>Balanced</span></button>
+          <button type="button" class="choiceBtn ${state.deliverySpeed==="fast"?"active":""}" data-value="fast"><span>Fastest</span></button>
+          <button type="button" class="choiceBtn ${state.deliverySpeed==="tracked"?"active":""}" data-value="tracked"><span>Tracked only</span></button>
+        </div>
       </div>
     </div>
   `;
@@ -1125,9 +1128,11 @@ function renderCaptureItemDetails(){
     state.declaredValue = raw.slice(0, 10);
     e.target.value = state.declaredValue;
   });
-  document.getElementById("contentDescInput").addEventListener("input", (e)=>{
-    state.contentDescription = (e.target.value || "").slice(0, 120);
-    e.target.value = state.contentDescription;
+  document.querySelectorAll("#captureSpeedChoices .choiceBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.deliverySpeed = btn.dataset.value || "balanced";
+      document.querySelectorAll("#captureSpeedChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
+    });
   });
 }
 
@@ -1148,13 +1153,8 @@ function renderFilterAndPresentOptions(){
 
     <div class="formRow">
       <div class="card">
-        <h3>Delivery speed preference (KIOSK-427)</h3>
-        <div class="choiceRow3" id="speedChoices">
-          <button type="button" class="choiceBtn ${state.deliverySpeed==="balanced"?"active":""}" data-value="balanced"><span>Balanced</span></button>
-          <button type="button" class="choiceBtn ${state.deliverySpeed==="fast"?"active":""}" data-value="fast"><span>Fastest</span></button>
-          <button type="button" class="choiceBtn ${state.deliverySpeed==="tracked"?"active":""}" data-value="tracked"><span>Tracked only</span></button>
-        </div>
-        <div class="helpNote">KIOSK-413/KIOSK-415/KIOSK-428: services are pre-filtered by item data and restrictions, then tracked services are prioritised.</div>
+        <h3>Service filtering (KIOSK-413 / KIOSK-415 / KIOSK-428)</h3>
+        <div class="helpNote">Using speed preference: <strong>${escapeHtml(state.deliverySpeed)}</strong>. Services are pre-filtered by item data/restrictions and tracked services are prioritised.</div>
 
         <h3 style="margin-top:14px;">Available services (KIOSK-414)</h3>
         <div class="choiceGroup" id="serviceChoices">
@@ -1233,23 +1233,6 @@ function renderFilterAndPresentOptions(){
       </div>
     </div>
   `;
-
-  document.querySelectorAll("#speedChoices .choiceBtn").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      state.deliverySpeed = btn.dataset.value || "balanced";
-      const validIds = new Set(availableServices().map(s => s.id));
-      if(!validIds.has(state.selectedServiceId)){
-        state.selectedServiceId = "";
-        state.productProfile = "royal_mail";
-        state.evriAdditionalSelection = "";
-        state.evriAdditionalBlocked = false;
-        state.evriScreeningComplete = false;
-        state.evriLossOnlySelected = false;
-        state.evriNoCompSelected = false;
-      }
-      render();
-    });
-  });
 
   document.querySelectorAll("#serviceChoices .choiceBtn[data-service-id]").forEach(btn=>{
     btn.addEventListener("click", ()=>{
@@ -1629,7 +1612,7 @@ function canContinue(){
   }
 
   if(state.step === 3){
-    return !!state.format && !!state.formatConfirmed && numericValue(state.declaredValue) > 0 && (state.contentDescription || "").trim().length >= 3;
+    return !!state.format && !!state.formatConfirmed && numericValue(state.declaredValue) > 0 && !!state.deliverySpeed;
   }
 
   if(state.step === 4){
@@ -1664,7 +1647,7 @@ function next(){
       return;
     }
     if(state.step === 3){
-      alert("Confirm format classification and declare item value/contents before continuing.");
+      alert("Confirm format classification, declare item value, and choose delivery speed preference before continuing.");
       return;
     }
     if(state.step === 4){
