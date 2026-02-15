@@ -358,7 +358,6 @@ const state = {
   restrictedKeys: new Set(),
   coverLossOnlyKeys: new Set(),
   coverNoCompKeys: new Set(),
-  formatConfirmed: false,
   declaredValue: "",
   contentDescription: "",
   deliverySpeed: "",
@@ -1245,7 +1244,6 @@ function applyQuickDemoDefaults(){
     }
   }
 
-  if(state.format && !state.formatConfirmed) state.formatConfirmed = true;
   if(!state.declaredValue) state.declaredValue = "39.99";
   if(!state.contentDescription) state.contentDescription = "Books and stationery";
   if(isDomesticJourney()){
@@ -1968,10 +1966,6 @@ function renderCaptureItemDetails(){
             <button type="button" class="choiceBtn ${state.format==="large_letter"?"active":""}" data-value="large_letter"><span>Large Letter</span></button>
             <button type="button" class="choiceBtn ${state.format==="parcel"?"active":""}" data-value="parcel"><span>Parcel</span></button>
           </div>
-          <label style="display:flex;gap:8px;align-items:flex-start;margin-top:14px;font-weight:700;">
-            <input type="checkbox" id="formatConfirmed" ${state.formatConfirmed ? "checked" : ""}/>
-            <span>I confirm the sidecar classification is correct.</span>
-          </label>
 
           <h3 style="margin-top:14px;">Declare item value (KIOSK-407)</h3>
           <input id="declaredValueInput" inputmode="decimal" placeholder="e.g. 49.99" value="${escapeHtml(state.declaredValue)}" />
@@ -1992,13 +1986,8 @@ function renderCaptureItemDetails(){
   document.querySelectorAll("#captureFormatChoices .choiceBtn").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       state.format = btn.dataset.value || state.format;
-      state.formatConfirmed = false;
       document.querySelectorAll("#captureFormatChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
-      document.getElementById("formatConfirmed").checked = false;
     });
-  });
-  document.getElementById("formatConfirmed").addEventListener("change", (e)=>{
-    state.formatConfirmed = !!e.target.checked;
   });
   // Value and contents are captured on the same screen as sidecar confirmation.
   document.getElementById("declaredValueInput").addEventListener("input", (e)=>{
@@ -2856,7 +2845,7 @@ function canContinue(){
 
   if(state.step === 3){
     const speedOk = !isDomesticJourney() || isValidDomesticDeliveryPreference(state.deliverySpeed);
-    return !!state.format && !!state.formatConfirmed && numericValue(state.declaredValue) > 0 && speedOk;
+    return !!state.format && numericValue(state.declaredValue) > 0 && speedOk;
   }
 
   if(state.step === 4){
@@ -2902,8 +2891,8 @@ function next(){
     }
     if(state.step === 3){
       alert(isDomesticJourney()
-        ? "Confirm format classification, declare item value, and choose delivery speed preference before continuing."
-        : "Confirm format classification and declare item value before continuing.");
+        ? "Select format, declare item value, and choose delivery speed preference before continuing."
+        : "Select format and declare item value before continuing.");
       return;
     }
     if(state.step === 4){
@@ -2970,7 +2959,6 @@ function resetAll(){
   state.restrictedKeys = new Set();
   state.coverLossOnlyKeys = new Set();
   state.coverNoCompKeys = new Set();
-  state.formatConfirmed = false;
   state.declaredValue = "";
   state.contentDescription = "";
   state.deliverySpeed = "";
