@@ -2165,8 +2165,8 @@ function renderWeigh(){
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Place Item On Scales</h1>
-        <p class="subtitle">Place your item on the scales with the address facing up.</p>
+        <h1>Confirm the weight of your item</h1>
+        <p class="subtitle">Using the scales, please confirm the weight of the item being posted.</p>
       </div>
       <span class="pill"><span class="material-symbols-outlined">scale</span> Item On Scales (KIOSK-404)</span>
     </div>
@@ -2176,20 +2176,20 @@ function renderWeigh(){
         <div class="card">
           <div class="scalePromptPanel">
             <div class="scalePromptIcon"><span class="material-symbols-outlined">scale</span></div>
-            <h2 class="scalePromptTitle">Place your item on the scales with the address facing up</h2>
+            <h2 class="scalePromptTitle">Using the scales, please confirm the weight of the item being posted</h2>
             <p class="scalePromptText">Scales are just above the screen</p>
             <div class="scalePromptArrow">↑</div>
           </div>
 
           <div class="weightConfirmCard">
             <div class="weightCopy">
-              <p class="label">Your item weighs</p>
+              <p class="label">Captured weight</p>
               <p class="value" id="weightReadout">${state.weightG ? `${escapeHtml(state.weightG)}g` : "--g"}</p>
               <button type="button" class="btn secondary weightEditBtn" id="weightEditBtn">
-                <span class="material-symbols-outlined">edit</span>${showManualWeightEditor ? "Hide manual entry" : "Edit weight"}
+                <span class="material-symbols-outlined">edit</span>${showManualWeightEditor ? "Hide manual entry" : "Edit captured weight"}
               </button>
               <div class="weightInline ${showManualWeightEditor ? "show" : ""}" id="weightInlinePanel">
-                <p>Enter weight manually (grams) if not auto-populated.</p>
+                <p>Using the keypad, enter weight manually (grams) if not auto-populated.</p>
                 <input id="weightInlineInput" inputmode="numeric" placeholder="e.g. 850" value="${escapeHtml(state.weightG)}" />
               </div>
             </div>
@@ -2203,7 +2203,7 @@ function renderWeigh(){
               <span class="material-symbols-outlined">replay</span>Try again
             </button>
             <button type="button" class="btn primary" id="weightConfirmBtn">
-              <span class="material-symbols-outlined">check_circle</span>Weight is correct
+              <span class="material-symbols-outlined">check_circle</span>Confirm weight
             </button>
           </div>
         </div>
@@ -2255,7 +2255,7 @@ function renderWeigh(){
   });
   document.getElementById("weightConfirmBtn").addEventListener("click", ()=>{
     if(!state.weightG){
-      alert("Capture weight before continuing.");
+      alert("Please capture or enter item weight before continuing.");
       return;
     }
     state.manualWeightEditOpen = false;
