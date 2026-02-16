@@ -2780,7 +2780,7 @@ function renderCaptureItemDetails(){
         <button type="button" class="choiceBtn ${state.format==="parcel"?"active":""}" data-value="parcel"><span>Parcel</span></button>
       </div>
 
-      <h3 style="margin-top:14px;">Declare item value (KIOSK-407)</h3>
+      <h3 style="margin-top:14px;">Using the keypad, please enter the value of the item being posted (KIOSK-407)</h3>
       <input id="declaredValueInput" inputmode="decimal" placeholder="e.g. 49.99" value="${escapeHtml(state.declaredValue)}" />
 
       ${speedSection}
@@ -3703,8 +3703,8 @@ function next(){
     }
     if(state.step === 3){
       alert(isDomesticJourney()
-        ? "Select format, declare item value, and choose delivery speed preference before continuing."
-        : "Select format and declare item value before continuing.");
+        ? "Confirm format, enter item value, and choose delivery speed preference before continuing."
+        : "Confirm format and enter item value before continuing.");
       return;
     }
     if(state.step === 4){
