@@ -1954,7 +1954,11 @@ function applyQuickDemoDefaults(){
     state.evriAdditionalSelection = "clear";
     state.evriSelectedProhibitedKey = null;
     state.evriAdditionalBlocked = false;
-    state.evriScreeningComplete = true;
+    state.evriScreeningComplete = false;
+    state.evriLossOnlySelected = false;
+    state.evriNoCompSelected = false;
+    state.coverLossOnlyKeys = new Set();
+    state.coverNoCompKeys = new Set();
   }
 
   if(!state.paymentMethod) state.paymentMethod = "card";
@@ -3267,6 +3271,14 @@ function renderFilterAndPresentOptions(){
       state.coverNoCompKeys = new Set();
     } else if(state.productProfile === "evri_dpd"){
       state.evriScreeningOpen = false;
+      state.evriAdditionalSelection = "";
+      state.evriSelectedProhibitedKey = null;
+      state.evriAdditionalBlocked = false;
+      state.evriScreeningComplete = false;
+      state.evriLossOnlySelected = false;
+      state.evriNoCompSelected = false;
+      state.coverLossOnlyKeys = new Set();
+      state.coverNoCompKeys = new Set();
     }
   };
   const evriProhibitedLabel = state.evriSelectedProhibitedKey
@@ -3655,7 +3667,16 @@ function renderBasketAndPay(){
   const rmDgSnippet = state.rmOtherSelected
     ? "RM DG: Other / not listed"
     : (rmRule ? `RM DG: ${rmRule.label}` : "RM DG: Not set");
+  const evriNoCompLabels = [...state.coverNoCompKeys]
+    .map(key => NO_COMP.find(item => item.key === key)?.label)
+    .filter(Boolean);
+  const evriLossLabels = [...state.coverLossOnlyKeys]
+    .map(key => LOSS_ONLY.find(item => item.key === key)?.label)
+    .filter(Boolean);
   const podSnippet = state.proofOfDelivery ? "Proof of delivery: Yes (+£1.50)" : "Proof of delivery: No";
+  const carrierContentSnippet = service && service.profile === "evri_dpd"
+    ? `EVRi/DPD screening: ${state.evriScreeningComplete ? "Complete" : "Pending"} • No-comp: ${state.evriNoCompSelected ? "Yes" : "No"} • Loss-only: ${state.evriLossOnlySelected ? "Yes" : "No"}`
+    : rmDgSnippet;
   const itemHeading = service
     ? `${service.name} • ${state.recipientPostcode || "Postcode not set"} • ${profileLabel}`
     : "No item currently in basket";
@@ -3686,13 +3707,23 @@ function renderBasketAndPay(){
               <div class="basketItemMain">${escapeHtml(itemHeading)}</div>
               <div class="basketItemSub">To: ${escapeHtml(clip(recipientSnippet, 72))}</div>
               <div class="basketItemSub">From: ${escapeHtml(clip(senderSnippet, 72))}</div>
-              <div class="basketItemSub">${escapeHtml(podSnippet)} • ${escapeHtml(rmDgSnippet)}</div>
+              <div class="basketItemSub">${escapeHtml(podSnippet)} • ${escapeHtml(carrierContentSnippet)}</div>
             </div>
             <div class="basketItemPrice">£${basePrice.toFixed(2)}</div>
             <button type="button" class="basketRemoveBtn" id="basketRemoveBtn" aria-label="Remove item">
               <span class="material-symbols-outlined">delete</span>
             </button>
           </div>
+          ${service.profile === "evri_dpd" && state.evriNoCompSelected ? `
+            <div class="banner warn show" style="display:block; margin:12px 14px;">
+              No-compensation category selected${evriNoCompLabels.length ? `: ${escapeHtml(evriNoCompLabels.join(", "))}` : ""}. Item travels at sender risk.
+            </div>
+          ` : ""}
+          ${service.profile === "evri_dpd" && state.evriLossOnlySelected ? `
+            <div class="banner ok show" style="display:block; margin:12px 14px;">
+              Loss-only category selected${evriLossLabels.length ? `: ${escapeHtml(evriLossLabels.join(", "))}` : ""}. Damage not protected.
+            </div>
+          ` : ""}
         ` : `
           <div class="basketEmpty">No item has been added. Go back and select a postage product.</div>
         `}
