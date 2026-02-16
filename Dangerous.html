@@ -203,6 +203,9 @@
       grid-template-columns:1fr 1fr;
       gap:10px;
     }
+    .launchControlRow.three{
+      grid-template-columns:repeat(3,minmax(0,1fr));
+    }
     .launchControlBtn{
       border:1px solid var(--border);
       background:#fff;
@@ -975,7 +978,7 @@ const state = {
   format: "",
   destination: "",
   productProfile: "royal_mail",
-  quickDemoMode: true,
+  quickDemoMode: "uk",
   prohibitedKey: null,    // if set -> hard stop message
   prohibitedOtherSelected: false,
   rmSelectedKey: null,
@@ -1639,6 +1642,41 @@ function applyDestinationSelection(value){
   setDestinationPill();
 }
 
+function isQuickDemoEnabled(){
+  return state.quickDemoMode !== "off";
+}
+
+function setQuickDemoPreset(mode){
+  const next = (mode === "uk" || mode === "uk_ni" || mode === "off") ? mode : "off";
+  state.quickDemoMode = next;
+  if(next === "off"){
+    return;
+  }
+  state.destination = "uk";
+  if(next === "uk"){
+    if(!state.recipientPostcode || isBTPostcode(state.recipientPostcode)){
+      state.recipientPostcode = "SW1A 1AA";
+      state.recipientAddress = "10 Downing Street, London";
+    }
+    state.niCustomsConfirmed = false;
+    state.niCustomsReference = "";
+    state.niSpsCategory = "";
+    state.niPrivateIndividual = "";
+    state.rmNiPerishableRoute = "";
+    state.rmNiPlantCertRef = "";
+  } else {
+    if(!isBTPostcode(state.recipientPostcode)){
+      state.recipientPostcode = "BT1 5GS";
+      state.recipientAddress = "1 Royal Avenue, Belfast";
+    }
+  }
+  const chosen = selectedService();
+  if(!chosen || chosen.profile !== "evri_dpd"){
+    state.senderPostcode = "";
+    state.senderAddress = "";
+  }
+}
+
 function isBTPostcode(value){
   return /^BT/i.test((value || "").trim());
 }
@@ -1891,11 +1929,11 @@ function basketTotal(){
 }
 
 function applyQuickDemoDefaults(){
-  if(!state.quickDemoMode) return;
+  if(!isQuickDemoEnabled()) return;
 
   if(!state.weightG) state.weightG = "850";
   if(state.weightG) state.manualWeightEditOpen = false;
-  if(!state.destination) state.destination = "uk";
+  if(state.destination !== "uk") state.destination = "uk";
   if(!state.format) state.format = "parcel";
   if(!state.rmSelectedKey){
     state.rmSelectedKey = "rm_other_not_listed";
@@ -1926,10 +1964,27 @@ function applyQuickDemoDefaults(){
   } else {
     state.deliverySpeed = "";
   }
-  if(!state.recipientPostcode) state.recipientPostcode = "BT1 5GS";
-  if(!state.recipientAddress) state.recipientAddress = "1 Royal Avenue, Belfast";
-  if(!state.senderPostcode) state.senderPostcode = "EC1A 1AA";
-  if(!state.senderAddress) state.senderAddress = "185 Farringdon Road, London";
+  if(state.quickDemoMode === "uk_ni"){
+    if(!isBTPostcode(state.recipientPostcode)){
+      state.recipientPostcode = "BT1 5GS";
+      state.recipientAddress = "1 Royal Avenue, Belfast";
+    } else if(!state.recipientAddress){
+      state.recipientAddress = "1 Royal Avenue, Belfast";
+    }
+  } else {
+    if(!state.recipientPostcode || isBTPostcode(state.recipientPostcode)){
+      state.recipientPostcode = "SW1A 1AA";
+      state.recipientAddress = "10 Downing Street, London";
+    } else if(!state.recipientAddress){
+      state.recipientAddress = "10 Downing Street, London";
+    }
+    state.niCustomsConfirmed = false;
+    state.niCustomsReference = "";
+    state.niSpsCategory = "";
+    state.niPrivateIndividual = "";
+    state.rmNiPerishableRoute = "";
+    state.rmNiPlantCertRef = "";
+  }
   if(state.destination === "uk" && isBTPostcode(state.recipientPostcode)){
     if(!state.niCustomsReference) state.niCustomsReference = "NI-EXAMPLE-001";
     if(!state.niSpsCategory) state.niSpsCategory = "no";
@@ -1950,6 +2005,8 @@ function applyQuickDemoDefaults(){
     state.productProfile = selected.profile;
   }
   if(selected && selected.profile === "evri_dpd"){
+    if(!state.senderPostcode) state.senderPostcode = "EC1A 1AA";
+    if(!state.senderAddress) state.senderAddress = "185 Farringdon Road, London";
     state.evriScreeningOpen = false;
     state.evriAdditionalSelection = "clear";
     state.evriSelectedProhibitedKey = null;
@@ -1959,6 +2016,9 @@ function applyQuickDemoDefaults(){
     state.evriNoCompSelected = false;
     state.coverLossOnlyKeys = new Set();
     state.coverNoCompKeys = new Set();
+  } else if(selected && selected.profile !== "evri_dpd"){
+    state.senderPostcode = "";
+    state.senderAddress = "";
   }
 
   if(!state.paymentMethod) state.paymentMethod = "card";
@@ -2194,12 +2254,15 @@ function renderLaunch(){
       </div>
       <div class="launchControlCard">
         <h3>Demo Fast-Track</h3>
-        <div class="launchControlRow">
-          <button type="button" class="launchControlBtn ${!state.quickDemoMode ? "active" : ""}" id="launchDemoOffBtn">
+        <div class="launchControlRow three">
+          <button type="button" class="launchControlBtn ${state.quickDemoMode === "off" ? "active" : ""}" id="launchDemoOffBtn">
             <span>Off</span>
           </button>
-          <button type="button" class="launchControlBtn ${state.quickDemoMode ? "active" : ""}" id="launchDemoOnBtn">
-            <span>On</span>
+          <button type="button" class="launchControlBtn ${state.quickDemoMode === "uk" ? "active" : ""}" id="launchDemoUkBtn">
+            <span>UK</span>
+          </button>
+          <button type="button" class="launchControlBtn ${state.quickDemoMode === "uk_ni" ? "active" : ""}" id="launchDemoUkNiBtn">
+            <span>UK + NI</span>
           </button>
         </div>
       </div>
@@ -2227,11 +2290,16 @@ function renderLaunch(){
     render();
   });
   document.getElementById("launchDemoOffBtn").addEventListener("click", ()=>{
-    state.quickDemoMode = false;
+    setQuickDemoPreset("off");
     render();
   });
-  document.getElementById("launchDemoOnBtn").addEventListener("click", ()=>{
-    state.quickDemoMode = true;
+  document.getElementById("launchDemoUkBtn").addEventListener("click", ()=>{
+    setQuickDemoPreset("uk");
+    applyQuickDemoDefaults();
+    render();
+  });
+  document.getElementById("launchDemoUkNiBtn").addEventListener("click", ()=>{
+    setQuickDemoPreset("uk_ni");
     applyQuickDemoDefaults();
     render();
   });
@@ -2677,7 +2745,7 @@ function wireRMDangerousDetails(list){
       return;
     }
 
-    if(state.quickDemoMode){
+    if(isQuickDemoEnabled()){
       applyQuickDemoRMConditionCapture(item);
       const quickDemoErrors = validateRMConditionCapture(item);
       if(!quickDemoErrors.length){
@@ -3663,6 +3731,7 @@ function renderBasketAndPay(){
   };
   const recipientSnippet = [state.recipientPostcode, state.recipientAddress].filter(Boolean).join(" - ");
   const senderSnippet = [state.senderPostcode, state.senderAddress].filter(Boolean).join(" - ");
+  const showSenderSnippet = !!(service && service.profile === "evri_dpd");
   const rmRule = currentRMRule();
   const rmDgSnippet = state.rmOtherSelected
     ? "RM DG: Other / not listed"
@@ -3706,7 +3775,7 @@ function renderBasketAndPay(){
             <div class="basketItemMeta">
               <div class="basketItemMain">${escapeHtml(itemHeading)}</div>
               <div class="basketItemSub">To: ${escapeHtml(clip(recipientSnippet, 72))}</div>
-              <div class="basketItemSub">From: ${escapeHtml(clip(senderSnippet, 72))}</div>
+              ${showSenderSnippet ? `<div class="basketItemSub">From: ${escapeHtml(clip(senderSnippet, 72))}</div>` : ""}
               <div class="basketItemSub">${escapeHtml(podSnippet)} • ${escapeHtml(carrierContentSnippet)}</div>
             </div>
             <div class="basketItemPrice">£${basePrice.toFixed(2)}</div>
@@ -4271,7 +4340,7 @@ function resetAll(){
   state.format = "";
   state.destination = "";
   state.productProfile = "royal_mail";
-  state.quickDemoMode = true;
+  state.quickDemoMode = "uk";
   state.prohibitedKey = null;
   state.prohibitedOtherSelected = false;
   state.rmSelectedKey = null;
