@@ -3552,6 +3552,9 @@ function renderFilterAndPresentOptions(){
             <h3>Sender details (KIOSK-866)</h3>
             <input id="senderPostcodeInput" placeholder="Sender postcode" value="${escapeHtml(state.senderPostcode)}" />
             <input id="senderAddressInput" placeholder="Sender address line" value="${escapeHtml(state.senderAddress)}" style="margin-top:8px;" />
+            <button type="button" class="btn primary" id="openEvriScreeningBtn" style="margin-top:12px;">
+              Continue to EVRi/DPD screening <span class="material-symbols-outlined">arrow_forward</span>
+            </button>
           </div>
         </div>
         <aside class="flowAside">
@@ -3577,6 +3580,26 @@ function renderFilterAndPresentOptions(){
     sa.addEventListener("input", (e)=>{
       state.senderAddress = (e.target.value || "").slice(0, 80);
       e.target.value = state.senderAddress;
+    });
+    const openEvriScreeningBtn = document.getElementById("openEvriScreeningBtn");
+    if(openEvriScreeningBtn){
+      openEvriScreeningBtn.addEventListener("click", ()=>{
+        if(!state.senderPostcode || !state.senderAddress){
+          alert("Enter sender postcode and first address line before continuing.");
+          return;
+        }
+        state.evriScreeningOpen = true;
+        render();
+      });
+    }
+    [sp, sa].forEach((el)=>{
+      if(!el) return;
+      el.addEventListener("keydown", (e)=>{
+        if(e.key === "Enter"){
+          e.preventDefault();
+          if(openEvriScreeningBtn) openEvriScreeningBtn.click();
+        }
+      });
     });
     return;
   }
