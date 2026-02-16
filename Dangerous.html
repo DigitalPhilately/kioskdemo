@@ -2330,9 +2330,25 @@ function render(){
   } else if(state.step === 5){
     nextBtn.innerHTML = `Proceed to print <span class="material-symbols-outlined">arrow_forward</span>`;
   } else if(state.step === 4){
-    nextBtn.innerHTML = state.filterFlowStage === "address"
-      ? `Add to basket <span class="material-symbols-outlined">add_shopping_cart</span>`
-      : `Continue to address details <span class="material-symbols-outlined">arrow_forward</span>`;
+    const stage = state.filterFlowStage || "service";
+    const chosen = selectedService();
+    const needsEvri = !!(chosen && chosen.profile === "evri_dpd");
+    const niRoute = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
+    if(stage === "service"){
+      nextBtn.innerHTML = `Continue to recipient details <span class="material-symbols-outlined">arrow_forward</span>`;
+    } else if(stage === "recipient"){
+      nextBtn.innerHTML = needsEvri
+        ? `Continue to sender details <span class="material-symbols-outlined">arrow_forward</span>`
+        : (niRoute
+          ? `Continue to NI checks <span class="material-symbols-outlined">arrow_forward</span>`
+          : `Add to basket <span class="material-symbols-outlined">add_shopping_cart</span>`);
+    } else if(stage === "sender"){
+      nextBtn.innerHTML = (!state.evriScreeningComplete || state.evriAdditionalBlocked)
+        ? `Continue to EVRi/DPD screening <span class="material-symbols-outlined">arrow_forward</span>`
+        : `Add to basket <span class="material-symbols-outlined">add_shopping_cart</span>`;
+    } else {
+      nextBtn.innerHTML = `Add to basket <span class="material-symbols-outlined">add_shopping_cart</span>`;
+    }
   } else if(state.step === 3){
     nextBtn.innerHTML = `Filter services <span class="material-symbols-outlined">filter_list</span>`;
   } else {
@@ -3079,7 +3095,7 @@ function renderEvriAdditionalScreening(){
             <span class="tag"><span class="material-symbols-outlined">gpp_bad</span>No-comp: ${state.coverNoCompKeys.size ? "Yes" : "No"}</span>
           </div>
           <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
-            <button class="btn" id="evriScreeningBack"><span class="material-symbols-outlined">arrow_back</span>Back to services</button>
+            <button class="btn" id="evriScreeningBack"><span class="material-symbols-outlined">arrow_back</span>Back to sender details</button>
             <button class="btn primary" id="evriScreeningConfirm"><span class="material-symbols-outlined">task_alt</span>Confirm EVRi/DPD screening</button>
           </div>
           ${state.evriAdditionalSelection === "blocked" ? `
@@ -3096,7 +3112,7 @@ function renderEvriAdditionalScreening(){
           <h4>Journey Note</h4>
           <p>Select one prohibited outcome first. Use <strong>Other / not listed</strong> for clear items.</p>
           <p>Loss-only and no-compensation categories are optional multi-select flags for compensation handling.</p>
-          <p>Confirm screening to return to service filtering.</p>
+          <p>Confirm screening to continue to basket.</p>
         </div>
       </aside>
     </div>
@@ -3209,6 +3225,15 @@ function renderEvriAdditionalScreening(){
     state.evriNoCompSelected = state.coverNoCompKeys.size > 0;
     state.evriScreeningComplete = true;
     state.evriScreeningOpen = false;
+    if(state.evriAdditionalBlocked){
+      render();
+      return;
+    }
+    if(state.step === 4 && state.filterFlowStage === "sender"){
+      state.basketAdded = true;
+      navigateToStep(5);
+      return;
+    }
     render();
   });
 }
@@ -3265,15 +3290,32 @@ function renderFilterAndPresentOptions(){
     ? `NI route rule: ${niStatus.message}`
     : "";
 
-  if(state.filterFlowStage !== "address"){
-    if(state.evriScreeningOpen){
-      state.evriScreeningOpen = false;
-    }
+  const stage = state.filterFlowStage || "service";
+  if(stage === "sender" && !needsEvriAdditional){
+    state.filterFlowStage = "recipient";
+    renderFilterAndPresentOptions();
+    return;
+  }
+  if(stage === "ni" && (needsEvriAdditional || !showNI)){
+    state.filterFlowStage = "recipient";
+    renderFilterAndPresentOptions();
+    return;
+  }
+
+  if(!needsEvriAdditional && state.evriScreeningOpen){
+    state.evriScreeningOpen = false;
+  }
+  if(needsEvriAdditional && state.evriScreeningOpen){
+    renderEvriAdditionalScreening();
+    return;
+  }
+
+  if(stage === "service"){
     screen.innerHTML = `
       <div class="stepHeader">
         <div>
           <h1>Select postage product (KIOSK-414)</h1>
-          <p class="subtitle">Choose a product to continue to destination address entry.</p>
+          <p class="subtitle">Choose a product to continue to destination address details.</p>
         </div>
         <span class="pill"><span class="material-symbols-outlined">tune</span> Service filtering</span>
       </div>
@@ -3298,7 +3340,7 @@ function renderFilterAndPresentOptions(){
         <aside class="flowAside">
           <div class="flowNarrative">
             <h4>Journey Note</h4>
-            <p>Select a postage product, then press Continue to address details.</p>
+            <p>Select a postage product, then continue.</p>
             <p>${escapeHtml(narrativeSpeed)}</p>
             <p>${escapeHtml(narrativeRM)}</p>
             <p>${escapeHtml(narrativeCarrier)}</p>
@@ -3316,33 +3358,33 @@ function renderFilterAndPresentOptions(){
     return;
   }
 
-  if(!needsEvriAdditional && state.evriScreeningOpen){
-    state.evriScreeningOpen = false;
-  }
-  if(needsEvriAdditional && state.evriScreeningOpen){
-    renderEvriAdditionalScreening();
-    return;
-  }
+  if(stage === "recipient"){
+    const nextRecipientRoute = !chosenService
+      ? "Select a product first."
+      : needsEvriAdditional
+      ? "Next screen: sender postcode and first line of address."
+      : showNI
+      ? "Next screen: NI/Windsor checks."
+      : "Next screen: basket review.";
 
-  screen.innerHTML = `
-    <div class="stepHeader">
-      <div>
-        <h1>Enter destination address details (KIOSK-866)</h1>
-        <p class="subtitle">Capture recipient and sender details, then complete required checks.</p>
+    screen.innerHTML = `
+      <div class="stepHeader">
+        <div>
+          <h1>Enter destination address details (KIOSK-866)</h1>
+          <p class="subtitle">Enter recipient postcode and first line of address.</p>
+        </div>
+        <span class="pill"><span class="material-symbols-outlined">location_on</span> Address entry</span>
       </div>
-      <span class="pill"><span class="material-symbols-outlined">location_on</span> Address entry</span>
-    </div>
 
-    <div class="flowShell">
-      <div class="flowMain">
-        <div class="formRow stack">
+      <div class="flowShell">
+        <div class="flowMain">
           <div class="card">
             <h3>Selected postage product (KIOSK-414)</h3>
             ${chosenService ? `
               <div class="helpNote">
                 <strong>Product:</strong> ${escapeHtml(chosenService.name)}<br/>
-                <strong>Indicative price:</strong> £${calculateServicePrice(chosenService).toFixed(2)}<br/>
-                <strong>Profile:</strong> ${chosenService.profile === "evri_dpd" ? "EVRi/DPD" : "Royal Mail"}
+                <strong>Profile:</strong> ${chosenService.profile === "evri_dpd" ? "EVRi/DPD" : "Royal Mail"}<br/>
+                <strong>Indicative price:</strong> £${calculateServicePrice(chosenService).toFixed(2)}
               </div>
             ` : `
               <div class="banner danger show" style="display:block;">No product selected. Go back and choose a postage product first.</div>
@@ -3357,15 +3399,127 @@ function renderFilterAndPresentOptions(){
             <input id="recipientPostcodeInput" placeholder="Recipient postcode (e.g. SW1A 1AA)" value="${escapeHtml(state.recipientPostcode)}" />
             <input id="recipientAddressInput" placeholder="Recipient address line" value="${escapeHtml(state.recipientAddress)}" style="margin-top:8px;" />
           </div>
+        </div>
+        <aside class="flowAside">
+          <div class="flowNarrative">
+            <h4>Journey Note</h4>
+            <p>Enter recipient postcode and first address line only on this screen.</p>
+            <p>${escapeHtml(nextRecipientRoute)}</p>
+            <p>${escapeHtml(narrativeSpeed)}</p>
+            <p>${escapeHtml(narrativeRM)}</p>
+          </div>
+        </aside>
+      </div>
+    `;
+
+    const changeServiceBtn = document.getElementById("changeServiceBtn");
+    if(changeServiceBtn){
+      changeServiceBtn.addEventListener("click", ()=>{
+        state.filterFlowStage = "service";
+        render();
+      });
+    }
+
+    const rp = document.getElementById("recipientPostcodeInput");
+    const ra = document.getElementById("recipientAddressInput");
+    bindKioskKeyboard(rp, { title:"Enter recipient postcode", maxLen:10, uppercase:true });
+    bindKioskKeyboard(ra, { title:"Enter recipient address line 1", maxLen:80, uppercase:false });
+
+    rp.addEventListener("input", (e)=>{
+      const prevNI = isBTPostcode(state.recipientPostcode);
+      state.recipientPostcode = (e.target.value || "").toUpperCase().slice(0, 10);
+      e.target.value = state.recipientPostcode;
+      const nowNI = isBTPostcode(state.recipientPostcode);
+      if(prevNI !== nowNI){
+        if(!nowNI){
+          state.niCustomsReference = "";
+          state.niCustomsConfirmed = false;
+          state.niSpsCategory = "";
+          state.niPrivateIndividual = "";
+          state.rmNiPerishableRoute = "";
+          state.rmNiPlantCertRef = "";
+        }
+        render();
+      }
+    });
+    ra.addEventListener("input", (e)=>{
+      state.recipientAddress = (e.target.value || "").slice(0, 80);
+      e.target.value = state.recipientAddress;
+    });
+    return;
+  }
+
+  if(stage === "sender"){
+    screen.innerHTML = `
+      <div class="stepHeader">
+        <div>
+          <h1>Enter sender address details (KIOSK-866)</h1>
+          <p class="subtitle">Enter sender postcode and first line of address.</p>
+        </div>
+        <span class="pill"><span class="material-symbols-outlined">person_pin_circle</span> Sender details</span>
+      </div>
+
+      <div class="flowShell">
+        <div class="flowMain">
+          <div class="card">
+            <h3>Recipient details captured</h3>
+            <div class="helpNote">
+              <strong>Recipient:</strong> ${escapeHtml((state.recipientPostcode || "Not set"))} - ${escapeHtml(state.recipientAddress || "Not set")}
+            </div>
+          </div>
 
           <div class="card">
             <h3>Sender details (KIOSK-866)</h3>
             <input id="senderPostcodeInput" placeholder="Sender postcode" value="${escapeHtml(state.senderPostcode)}" />
             <input id="senderAddressInput" placeholder="Sender address line" value="${escapeHtml(state.senderAddress)}" style="margin-top:8px;" />
           </div>
+        </div>
+        <aside class="flowAside">
+          <div class="flowNarrative">
+            <h4>Journey Note</h4>
+            <p>EVRi/DPD product selected: sender details are required.</p>
+            <p>Next screen: EVRi/DPD goods/content screening.</p>
+            <p>${state.evriScreeningComplete ? "EVRi/DPD screening currently complete." : "EVRi/DPD screening currently pending."}</p>
+          </div>
+        </aside>
+      </div>
+    `;
 
-          ${showNI ? `
-          <div class="card">
+    const sp = document.getElementById("senderPostcodeInput");
+    const sa = document.getElementById("senderAddressInput");
+    bindKioskKeyboard(sp, { title:"Enter sender postcode", maxLen:10, uppercase:true });
+    bindKioskKeyboard(sa, { title:"Enter sender address line 1", maxLen:80, uppercase:false });
+
+    sp.addEventListener("input", (e)=>{
+      state.senderPostcode = (e.target.value || "").toUpperCase().slice(0, 10);
+      e.target.value = state.senderPostcode;
+    });
+    sa.addEventListener("input", (e)=>{
+      state.senderAddress = (e.target.value || "").slice(0, 80);
+      e.target.value = state.senderAddress;
+    });
+    return;
+  }
+
+  screen.innerHTML = `
+    <div class="stepHeader">
+      <div>
+        <h1>Northern Ireland / Windsor checks (KIOSK-867)</h1>
+        <p class="subtitle">Complete NI checks, then continue to basket.</p>
+      </div>
+      <span class="pill"><span class="material-symbols-outlined">location_on</span> NI checks</span>
+    </div>
+
+    <div class="flowShell">
+      <div class="flowMain">
+        <div class="card">
+          <h3>Recipient details captured</h3>
+          <div class="helpNote">
+            <strong>Recipient:</strong> ${escapeHtml((state.recipientPostcode || "Not set"))} - ${escapeHtml(state.recipientAddress || "Not set")}
+          </div>
+        </div>
+
+        <div class="card">
           <h3>Northern Ireland / Windsor checks (KIOSK-867)</h3>
           <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Does parcel include sanitary/phytosanitary goods (e.g. meat, dairy, plants)?</p>
           <div class="choiceRow" id="niSpsChoices">
@@ -3417,135 +3571,18 @@ function renderFilterAndPresentOptions(){
               </div>
             ` : ""}
           ` : ""}
-          </div>
-            ` : `
-          <div class="card">
-            <h3>Northern Ireland / Windsor checks (KIOSK-867)</h3>
-            <div class="helpNote">Not required unless recipient postcode is in Northern Ireland (BT).</div>
-          </div>
-            `}
-
-          <div class="card">
-            <h3>Proof of delivery add-on (KIOSK-416)</h3>
-            <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Offer proof of delivery as an optional add-on.</p>
-            <div class="choiceRow" id="podChoices">
-              <button type="button" class="choiceBtn ${state.proofOfDelivery?"active":""}" data-value="yes"><span>Yes, add proof of delivery</span></button>
-              <button type="button" class="choiceBtn ${!state.proofOfDelivery?"active":""}" data-value="no"><span>No add-on</span></button>
-            </div>
-          </div>
-
-          ${needsEvriAdditional ? `
-          <div class="card">
-          <h3>EVRi/DPD additional screening</h3>
-          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
-            <button type="button" class="btn" id="openEvriScreeningBtn">
-              <span class="material-symbols-outlined">fact_check</span>Open EVRi/DPD screening screens
-            </button>
-            <button type="button" class="btn ghost" id="resetEvriScreeningBtn">
-              <span class="material-symbols-outlined">restart_alt</span>Reset screening
-            </button>
-          </div>
-          ${state.evriAdditionalSelection==="blocked" ? `
-            <div class="banner danger show" style="display:block; margin-top:10px;">EVRi/DPD prohibited item selected. Cannot proceed with this service.</div>
-          ` : state.evriScreeningComplete ? `
-            <div class="banner ok show" style="display:block; margin-top:10px;">EVRi/DPD additional screening passed.</div>
-          ` : `
-            <div class="banner warn show" style="display:block; margin-top:10px;">Complete EVRi/DPD screening screens before continuing.</div>
-          `}
-          </div>
-            ` : `
-          <div class="card">
-            <h3>EVRi/DPD additional screening</h3>
-            <div class="helpNote">Not required for the selected product profile.</div>
-          </div>
-            `}
         </div>
       </div>
       <aside class="flowAside">
         <div class="flowNarrative">
           <h4>Journey Note</h4>
-          <p>Complete each section in order from top to bottom before adding to basket.</p>
-          <p>Confirm selected product first; use Change product to return to service selection.</p>
-          <p>Recipient and sender address details are mandatory.</p>
-          <p>${showNI ? "NI/Windsor checks are required for BT destinations." : "NI/Windsor checks are not required for current postcode."}</p>
-          <p>${needsEvriAdditional ? "EVRi/DPD additional screening is required for this product." : "EVRi/DPD additional screening is not required for this product."}</p>
-          <p>${escapeHtml(narrativeSpeed)}</p>
-          <p>${escapeHtml(narrativeRM)}</p>
+          <p>RM item to BT postcode: NI/Windsor checks are required before basket.</p>
           <p>${escapeHtml(narrativeNI)}</p>
           ${narrativeNIRule ? `<p>${escapeHtml(narrativeNIRule)}</p>` : ""}
-          <p>${escapeHtml(narrativeCarrier)}</p>
         </div>
       </aside>
     </div>
   `;
-
-  const changeServiceBtn = document.getElementById("changeServiceBtn");
-  if(changeServiceBtn){
-    changeServiceBtn.addEventListener("click", ()=>{
-      state.filterFlowStage = "service";
-      render();
-    });
-  }
-
-  const rp = document.getElementById("recipientPostcodeInput");
-  const ra = document.getElementById("recipientAddressInput");
-  const sp = document.getElementById("senderPostcodeInput");
-  const sa = document.getElementById("senderAddressInput");
-
-  bindKioskKeyboard(rp, { title:"Enter recipient postcode", maxLen:10, uppercase:true });
-  bindKioskKeyboard(ra, { title:"Enter recipient address", maxLen:80, uppercase:false });
-  bindKioskKeyboard(sp, { title:"Enter sender postcode", maxLen:10, uppercase:true });
-  bindKioskKeyboard(sa, { title:"Enter sender address", maxLen:80, uppercase:false });
-
-  rp.addEventListener("input", (e)=>{
-    const prevNI = isBTPostcode(state.recipientPostcode);
-    const prevGBToNI = isGBToNIJourney();
-    state.recipientPostcode = (e.target.value || "").toUpperCase().slice(0, 10);
-    e.target.value = state.recipientPostcode;
-    const nowNI = isBTPostcode(state.recipientPostcode);
-    const nowGBToNI = isGBToNIJourney();
-    if(prevNI !== nowNI){
-      if(!nowNI){
-        state.niCustomsReference = "";
-        state.niCustomsConfirmed = false;
-        state.niSpsCategory = "";
-        state.niPrivateIndividual = "";
-        state.rmNiPerishableRoute = "";
-        state.rmNiPlantCertRef = "";
-      }
-      render();
-      return;
-    }
-    if(prevGBToNI !== nowGBToNI){
-      if(!nowGBToNI){
-        state.rmNiPerishableRoute = "";
-        state.rmNiPlantCertRef = "";
-      }
-      render();
-    }
-  });
-  ra.addEventListener("input", (e)=>{ state.recipientAddress = (e.target.value || "").slice(0, 80); e.target.value = state.recipientAddress; });
-  sp.addEventListener("input", (e)=>{
-    const prevGBToNI = isGBToNIJourney();
-    state.senderPostcode = (e.target.value || "").toUpperCase().slice(0, 10);
-    e.target.value = state.senderPostcode;
-    const nowGBToNI = isGBToNIJourney();
-    if(prevGBToNI !== nowGBToNI){
-      if(!nowGBToNI){
-        state.rmNiPerishableRoute = "";
-        state.rmNiPlantCertRef = "";
-      }
-      render();
-    }
-  });
-  sa.addEventListener("input", (e)=>{ state.senderAddress = (e.target.value || "").slice(0, 80); e.target.value = state.senderAddress; });
-  const podChoices = document.querySelectorAll("#podChoices .choiceBtn");
-  podChoices.forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      state.proofOfDelivery = (btn.dataset.value || "") === "yes";
-      podChoices.forEach(b=>b.classList.toggle("active", b===btn));
-    });
-  });
 
   const niRef = document.getElementById("niReferenceInput");
   bindKioskKeyboard(niRef, { title:"Enter NI/Windsor reference", maxLen:40, uppercase:true });
@@ -3596,29 +3633,6 @@ function renderFilterAndPresentOptions(){
     rmNiPlantCertRefInput.addEventListener("input", (e)=>{
       state.rmNiPlantCertRef = (e.target.value || "").slice(0, 40);
       e.target.value = state.rmNiPlantCertRef;
-    });
-  }
-
-  const openEvriScreeningBtn = document.getElementById("openEvriScreeningBtn");
-  if(openEvriScreeningBtn){
-    openEvriScreeningBtn.addEventListener("click", ()=>{
-      state.evriScreeningOpen = true;
-      render();
-    });
-  }
-  const resetEvriScreeningBtn = document.getElementById("resetEvriScreeningBtn");
-  if(resetEvriScreeningBtn){
-    resetEvriScreeningBtn.addEventListener("click", ()=>{
-      state.evriScreeningOpen = false;
-      state.evriAdditionalSelection = "";
-      state.evriSelectedProhibitedKey = null;
-      state.evriAdditionalBlocked = false;
-      state.evriScreeningComplete = false;
-      state.evriLossOnlySelected = false;
-      state.evriNoCompSelected = false;
-      state.coverLossOnlyKeys = new Set();
-      state.coverNoCompKeys = new Set();
-      render();
     });
   }
 }
@@ -3744,22 +3758,41 @@ function renderBasketAndPay(){
       navigateToStep(4);
       return;
     }
-    const hasAddresses = !!state.recipientPostcode && !!state.recipientAddress && !!state.senderPostcode && !!state.senderAddress;
-    if(!hasAddresses){
-      alert("Complete recipient and sender address details before finishing.");
-      state.filterFlowStage = "address";
+    const hasRecipient = !!state.recipientPostcode && !!state.recipientAddress;
+    if(!hasRecipient){
+      alert("Complete recipient postcode and first address line before finishing.");
+      state.filterFlowStage = "recipient";
       navigateToStep(4);
       return;
     }
-    if(state.productProfile === "evri_dpd" && (!state.evriScreeningComplete || state.evriAdditionalBlocked)){
-      alert("Complete EVRi/DPD additional screening before finishing.");
-      state.filterFlowStage = "address";
-      navigateToStep(4);
-      return;
+    if(state.productProfile === "evri_dpd"){
+      const hasSender = !!state.senderPostcode && !!state.senderAddress;
+      if(!hasSender){
+        alert("Complete sender postcode and first address line before finishing.");
+        state.filterFlowStage = "sender";
+        navigateToStep(4);
+        return;
+      }
+      if(!state.evriScreeningComplete || state.evriAdditionalBlocked){
+        alert("Complete EVRi/DPD additional screening before finishing.");
+        state.filterFlowStage = "sender";
+        state.evriScreeningOpen = true;
+        navigateToStep(4);
+        return;
+      }
+    }
+    if(state.productProfile === "royal_mail" && isBTPostcode(state.recipientPostcode)){
+      const niReady = !!state.niCustomsReference && !!state.niSpsCategory && !!state.niPrivateIndividual && state.niCustomsConfirmed;
+      if(!niReady){
+        alert("Complete NI/Windsor checks before finishing.");
+        state.filterFlowStage = "ni";
+        navigateToStep(4);
+        return;
+      }
     }
     if(!rmNIStatus().ok){
       alert(rmNIStatus().message || "Complete NI/Windsor checks before finishing.");
-      state.filterFlowStage = "address";
+      state.filterFlowStage = "ni";
       navigateToStep(4);
       return;
     }
@@ -4023,17 +4056,25 @@ function canContinue(){
   }
 
   if(state.step === 4){
-    if(state.filterFlowStage !== "address"){
+    const stage = state.filterFlowStage || "service";
+    const service = selectedService();
+    const needsEvri = !!(service && service.profile === "evri_dpd");
+    if(stage === "service"){
       return !!state.selectedServiceId;
     }
-    if(state.evriScreeningOpen) return false;
-    const hasAddresses = !!state.recipientPostcode && !!state.recipientAddress && !!state.senderPostcode && !!state.senderAddress;
-    const hasService = !!state.selectedServiceId;
-    const needsNI = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
-    const niOk = !needsNI || (!!state.niCustomsReference && !!state.niSpsCategory && !!state.niPrivateIndividual && state.niCustomsConfirmed);
-    const rmNiOk = rmNIStatus().ok;
-    const evriOk = state.productProfile !== "evri_dpd" || (state.evriScreeningComplete && !state.evriAdditionalBlocked);
-    return hasAddresses && hasService && niOk && rmNiOk && evriOk;
+    if(stage === "recipient"){
+      return !!state.selectedServiceId && !!state.recipientPostcode && !!state.recipientAddress;
+    }
+    if(stage === "sender"){
+      return !!state.selectedServiceId && !!state.senderPostcode && !!state.senderAddress;
+    }
+    if(stage === "ni"){
+      const niOk = !!state.niCustomsReference && !!state.niSpsCategory && !!state.niPrivateIndividual && state.niCustomsConfirmed;
+      if(!niOk) return false;
+      return rmNIStatus().ok;
+    }
+    if(needsEvri && state.evriScreeningOpen) return false;
+    return false;
   }
 
   if(state.step === 5){
@@ -4073,24 +4114,33 @@ function next(){
       return;
     }
     if(state.step === 4){
-      if(state.filterFlowStage !== "address"){
-        alert("Select a postage product before continuing to address details.");
+      const stage = state.filterFlowStage || "service";
+      if(stage === "service"){
+        alert("Select a postage product before continuing.");
+        return;
+      }
+      if(stage === "recipient"){
+        alert("Enter recipient postcode and first address line before continuing.");
+        return;
+      }
+      if(stage === "sender"){
+        alert("Enter sender postcode and first address line before continuing.");
+        return;
+      }
+      if(stage === "ni"){
+        const niStatus = rmNIStatus();
+        if(!niStatus.ok){
+          alert(niStatus.message || "Complete Northern Ireland checks before continuing.");
+          return;
+        }
+        alert("Complete NI/Windsor declaration details before continuing.");
         return;
       }
       if(state.evriScreeningOpen){
         alert("Complete or close the EVRi/DPD screening screens before continuing.");
         return;
       }
-      if(state.productProfile === "evri_dpd" && state.evriAdditionalBlocked){
-        alert("EVRi/DPD prohibited item selected. Choose a different service or clear the screening result.");
-        return;
-      }
-      const niStatus = rmNIStatus();
-      if(!niStatus.ok){
-        alert(niStatus.message || "Complete Northern Ireland checks for the selected Royal Mail category.");
-        return;
-      }
-      alert("Complete address details, NI/Windsor checks (if applicable), select a service, and finish carrier-specific screening.");
+      alert("Complete this step before continuing.");
       return;
     }
     if(state.step === 5){
@@ -4105,24 +4155,81 @@ function next(){
     state.filterFlowStage = "service";
   }
 
-  if(state.step === 4 && state.filterFlowStage !== "address"){
-    state.filterFlowStage = "address";
-    render();
-    return;
-  }
-
   if(state.step === 4){
-    state.basketAdded = true;
+    const stage = state.filterFlowStage || "service";
+    const service = selectedService();
+    const needsEvri = !!(service && service.profile === "evri_dpd");
+    const recipientIsBT = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
+
+    if(stage === "service"){
+      state.filterFlowStage = "recipient";
+      render();
+      return;
+    }
+    if(stage === "recipient"){
+      if(needsEvri){
+        state.filterFlowStage = "sender";
+        render();
+        return;
+      }
+      if(recipientIsBT){
+        state.filterFlowStage = "ni";
+        render();
+        return;
+      }
+      state.basketAdded = true;
+      navigateToStep(5);
+      return;
+    }
+    if(stage === "sender"){
+      if(needsEvri){
+        if(state.evriAdditionalBlocked){
+          alert("EVRi/DPD prohibited item selected. Choose a different service or clear the screening result.");
+          return;
+        }
+        if(!state.evriScreeningComplete){
+          state.evriScreeningOpen = true;
+          render();
+          return;
+        }
+      }
+      state.basketAdded = true;
+      navigateToStep(5);
+      return;
+    }
+    if(stage === "ni"){
+      const niStatus = rmNIStatus();
+      if(!niStatus.ok){
+        alert(niStatus.message || "Complete Northern Ireland checks before continuing.");
+        return;
+      }
+      state.basketAdded = true;
+      navigateToStep(5);
+      return;
+    }
   }
 
   if(state.step < stepCount()) navigateToStep(state.step + 1);
 }
 
 function back(){
-  if(state.step === 4 && state.filterFlowStage === "address"){
-    state.filterFlowStage = "service";
-    render();
-    return;
+  if(state.step === 4){
+    if(state.evriScreeningOpen){
+      state.evriScreeningOpen = false;
+      render();
+      return;
+    }
+    const stage = state.filterFlowStage || "service";
+    if(stage === "ni" || stage === "sender"){
+      state.filterFlowStage = "recipient";
+      render();
+      return;
+    }
+    if(stage === "recipient"){
+      state.filterFlowStage = "service";
+      render();
+      return;
+    }
   }
   if(state.step > 0) navigateToStep(state.step - 1);
 }
