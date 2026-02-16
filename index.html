@@ -180,6 +180,56 @@
       font-weight:700;
       color:var(--muted);
     }
+    .launchControls{
+      margin-top:16px;
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:16px;
+    }
+    .launchControlCard{
+      border:1px solid var(--border);
+      border-radius:18px;
+      background:#fff;
+      padding:14px;
+    }
+    .launchControlCard h3{
+      margin:0 0 8px;
+      color:#17344f;
+      font-size:20px;
+      font-weight:900;
+    }
+    .launchControlRow{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+    .launchControlBtn{
+      border:1px solid var(--border);
+      background:#fff;
+      color:var(--text);
+      border-radius:14px;
+      min-height:72px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      gap:8px;
+      font-size:20px;
+      font-weight:900;
+      cursor:pointer;
+      padding:8px 10px;
+    }
+    .launchControlBtn.active{
+      border-color:var(--accent2);
+      box-shadow:0 0 0 4px rgba(46,122,184,.15);
+      background:#f2f9ff;
+    }
+    .launchControlBtn .sub{
+      display:block;
+      font-size:13px;
+      color:var(--muted);
+      font-weight:700;
+    }
     .screenRefreshOverlay{
       position:absolute;
       inset:0;
@@ -646,6 +696,9 @@
       .launchTile{min-height:130px;font-size:24px;padding:16px;}
       .launchTile .material-symbols-outlined{font-size:44px;}
       .launchTile .sub{font-size:14px;}
+      .launchControls{grid-template-columns:1fr;gap:12px;}
+      .launchControlCard h3{font-size:17px;}
+      .launchControlBtn{min-height:60px;font-size:16px;}
       .vkWrap{bottom:74px;padding:10px;}
       .vkHead{font-size:16px;}
       .vkMirror{font-size:20px;min-height:50px;}
@@ -1355,6 +1408,37 @@ function setDestinationPill(){
   destLabel.textContent = state.destination === "uk" ? "UK" : "International";
 }
 
+function applyDestinationSelection(value){
+  state.destination = value || "";
+  state.selectedServiceId = "";
+  state.productProfile = "royal_mail";
+  state.niCustomsConfirmed = false;
+  state.niCustomsReference = "";
+  state.niSpsCategory = "";
+  state.niPrivateIndividual = "";
+  state.rmNiPerishableRoute = "";
+  state.rmNiPlantCertRef = "";
+  state.rmSelectedKey = null;
+  state.rmBlockedKey = null;
+  state.rmOtherSelected = false;
+  resetRMConditionCapture();
+  if(state.destination === "uk"){
+    if(!domesticDeliveryPreferences().some(opt => opt.key === state.deliverySpeed)){
+      state.deliverySpeed = "";
+    }
+  } else {
+    state.deliverySpeed = "";
+  }
+  state.evriScreeningOpen = false;
+  state.evriAdditionalSelection = "";
+  state.evriSelectedProhibitedKey = null;
+  state.evriAdditionalBlocked = false;
+  state.evriScreeningComplete = false;
+  state.evriLossOnlySelected = false;
+  state.evriNoCompSelected = false;
+  setDestinationPill();
+}
+
 function isBTPostcode(value){
   return /^BT/i.test((value || "").trim());
 }
@@ -1865,6 +1949,10 @@ function navigateToStep(targetStep){
 }
 
 function renderLaunch(){
+  if(!state.destination){
+    applyDestinationSelection("uk");
+  }
+
   screen.innerHTML = `
     <div class="launchHeader">What do you want to do today?</div>
     <div class="launchGrid">
@@ -1885,6 +1973,31 @@ function renderLaunch(){
         <span>Purchase stamps <span class="sub">Demo placeholder</span></span>
       </button>
     </div>
+
+    <div class="launchControls">
+      <div class="launchControlCard">
+        <h3>Destination</h3>
+        <div class="launchControlRow">
+          <button type="button" class="launchControlBtn ${state.destination === "uk" ? "active" : ""}" id="launchDestUkBtn">
+            <span>UK (Inc NI)</span>
+          </button>
+          <button type="button" class="launchControlBtn ${state.destination === "intl" ? "active" : ""}" id="launchDestIntlBtn">
+            <span>International</span>
+          </button>
+        </div>
+      </div>
+      <div class="launchControlCard">
+        <h3>Demo Fast-Track</h3>
+        <div class="launchControlRow">
+          <button type="button" class="launchControlBtn ${!state.quickDemoMode ? "active" : ""}" id="launchDemoOffBtn">
+            <span>Off</span>
+          </button>
+          <button type="button" class="launchControlBtn ${state.quickDemoMode ? "active" : ""}" id="launchDemoOnBtn">
+            <span>On</span>
+          </button>
+        </div>
+      </div>
+    </div>
   `;
 
   document.getElementById("launchPostBtn").addEventListener("click", ()=>{
@@ -1897,6 +2010,24 @@ function renderLaunch(){
         alert("This option is not included in this wireframe. Use 'Post an item' to continue.");
       });
     }
+  });
+
+  document.getElementById("launchDestUkBtn").addEventListener("click", ()=>{
+    applyDestinationSelection("uk");
+    render();
+  });
+  document.getElementById("launchDestIntlBtn").addEventListener("click", ()=>{
+    applyDestinationSelection("intl");
+    render();
+  });
+  document.getElementById("launchDemoOffBtn").addEventListener("click", ()=>{
+    state.quickDemoMode = false;
+    render();
+  });
+  document.getElementById("launchDemoOnBtn").addEventListener("click", ()=>{
+    state.quickDemoMode = true;
+    applyQuickDemoDefaults();
+    render();
   });
 }
 
@@ -2004,7 +2135,7 @@ function render(){
 
 function renderWeigh(){
   if(!state.destination){
-    state.destination = "uk";
+    applyDestinationSelection("uk");
   }
   setDestinationPill();
 
@@ -2038,20 +2169,10 @@ function renderWeigh(){
           </div>
 
           <div class="weighAssist">
-            <h3>Destination</h3>
-            <p>R1.0 defaults to UK (Inc NI). Change only if posting International.</p>
-            <div class="choiceGroup">
-              <div class="choiceRow" id="destChoices">
-                <button type="button" class="choiceBtn ${state.destination==="uk"?"active":""}" data-value="uk">
-                  <span>🇬🇧 UK</span>
-                  <span class="sub">Inland</span>
-                </button>
-                <button type="button" class="choiceBtn ${state.destination==="intl"?"active":""}" data-value="intl">
-                  <span>🌍 International</span>
-                  <span class="sub">Overseas</span>
-                </button>
-              </div>
-            </div>
+            <h3>Journey setup</h3>
+            <p>Destination and demo mode are set on the launch screen.</p>
+            <span class="tag"><span class="material-symbols-outlined">public</span>Destination: ${state.destination === "uk" ? "UK (Inc NI)" : "International"}</span>
+            <span class="tag"><span class="material-symbols-outlined">bolt</span>Demo fast-track: ${state.quickDemoMode ? "On" : "Off"}</span>
 
             <p style="margin-top:12px;">Demo only: enter sample scale value (grams)</p>
             <input id="weightInput" inputmode="numeric" placeholder="e.g. 350" value="${escapeHtml(state.weightG)}" />
@@ -2063,14 +2184,6 @@ function renderWeigh(){
               <button type="button" class="btn primary" id="weightConfirmBtn">
                 <span class="material-symbols-outlined">check_circle</span>Weight is correct
               </button>
-            </div>
-
-            <div class="demoToggleRow">
-              <label class="demoToggle">
-                <span>Demo fast-track</span>
-                <input type="checkbox" id="quickDemoToggle" ${state.quickDemoMode ? "checked" : ""}/>
-                <span class="track"><span class="thumb"></span></span>
-              </label>
             </div>
           </div>
         </div>
@@ -2121,46 +2234,6 @@ function renderWeigh(){
       return;
     }
     next();
-  });
-  document.querySelectorAll("#destChoices .choiceBtn").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      state.destination = btn.dataset.value || "";
-      state.selectedServiceId = "";
-      state.productProfile = "royal_mail";
-      state.niCustomsConfirmed = false;
-      state.niCustomsReference = "";
-      state.niSpsCategory = "";
-      state.niPrivateIndividual = "";
-      state.rmNiPerishableRoute = "";
-      state.rmNiPlantCertRef = "";
-      state.rmSelectedKey = null;
-      state.rmBlockedKey = null;
-      state.rmOtherSelected = false;
-      resetRMConditionCapture();
-      if(state.destination === "uk"){
-        if(!domesticDeliveryPreferences().some(opt => opt.key === state.deliverySpeed)){
-          state.deliverySpeed = "";
-        }
-      } else {
-        state.deliverySpeed = "";
-      }
-      state.evriScreeningOpen = false;
-      state.evriAdditionalSelection = "";
-      state.evriSelectedProhibitedKey = null;
-      state.evriAdditionalBlocked = false;
-      state.evriScreeningComplete = false;
-      state.evriLossOnlySelected = false;
-      state.evriNoCompSelected = false;
-      document.querySelectorAll("#destChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
-      setDestinationPill();
-    });
-  });
-  document.getElementById("quickDemoToggle").addEventListener("change", (e)=>{
-    state.quickDemoMode = !!e.target.checked;
-    if(state.quickDemoMode){
-      applyQuickDemoDefaults();
-    }
-    render();
   });
 }
 
