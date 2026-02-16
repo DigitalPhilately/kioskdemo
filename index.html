@@ -2007,15 +2007,13 @@ function applyQuickDemoDefaults(){
   if(selected && selected.profile === "evri_dpd"){
     if(!state.senderPostcode) state.senderPostcode = "EC1A 1AA";
     if(!state.senderAddress) state.senderAddress = "185 Farringdon Road, London";
-    state.evriScreeningOpen = false;
-    state.evriAdditionalSelection = "clear";
-    state.evriSelectedProhibitedKey = null;
-    state.evriAdditionalBlocked = false;
-    state.evriScreeningComplete = false;
-    state.evriLossOnlySelected = false;
-    state.evriNoCompSelected = false;
-    state.coverLossOnlyKeys = new Set();
-    state.coverNoCompKeys = new Set();
+    if(!state.evriAdditionalSelection && !state.evriSelectedProhibitedKey){
+      state.evriAdditionalSelection = "clear";
+      state.evriSelectedProhibitedKey = null;
+      state.evriAdditionalBlocked = false;
+    }
+    state.evriLossOnlySelected = state.coverLossOnlyKeys.size > 0;
+    state.evriNoCompSelected = state.coverNoCompKeys.size > 0;
   } else if(selected && selected.profile !== "evri_dpd"){
     state.senderPostcode = "";
     state.senderAddress = "";
