@@ -3171,16 +3171,20 @@ function renderFilterAndPresentOptions(){
           </div>
 
           <div class="card">
-            <h3>Enter address details (KIOSK-866)</h3>
-            <p>Recipient details</p>
+            <h3>Recipient details (KIOSK-866)</h3>
             <input id="recipientPostcodeInput" placeholder="Recipient postcode (e.g. SW1A 1AA)" value="${escapeHtml(state.recipientPostcode)}" />
             <input id="recipientAddressInput" placeholder="Recipient address line" value="${escapeHtml(state.recipientAddress)}" style="margin-top:8px;" />
-            <p style="margin-top:10px;">Sender details</p>
+          </div>
+
+          <div class="card">
+            <h3>Sender details (KIOSK-866)</h3>
             <input id="senderPostcodeInput" placeholder="Sender postcode" value="${escapeHtml(state.senderPostcode)}" />
             <input id="senderAddressInput" placeholder="Sender address line" value="${escapeHtml(state.senderAddress)}" style="margin-top:8px;" />
+          </div>
 
-            ${showNI ? `
-          <h3 style="margin-top:14px;">Northern Ireland / Windsor checks (KIOSK-867)</h3>
+          ${showNI ? `
+          <div class="card">
+          <h3>Northern Ireland / Windsor checks (KIOSK-867)</h3>
           <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Does parcel include sanitary/phytosanitary goods (e.g. meat, dairy, plants)?</p>
           <div class="choiceRow" id="niSpsChoices">
             <button type="button" class="choiceBtn ${state.niSpsCategory==="no"?"active":""}" data-value="no"><span>No</span></button>
@@ -3192,10 +3196,11 @@ function renderFilterAndPresentOptions(){
             <button type="button" class="choiceBtn ${state.niPrivateIndividual==="no"?"active":""}" data-value="no"><span>No</span></button>
           </div>
           <input id="niReferenceInput" placeholder="NI/Windsor declaration reference" value="${escapeHtml(state.niCustomsReference)}" style="margin-top:8px;" />
-          <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-weight:700;">
-            <input type="checkbox" id="niConfirmed" ${state.niCustomsConfirmed ? "checked" : ""}/>
-            <span>I confirm NI/Windsor information has been captured and validated.</span>
-          </label>
+          <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Confirm NI/Windsor information has been captured and validated.</p>
+          <div class="choiceRow" id="niConfirmChoices">
+            <button type="button" class="choiceBtn ${state.niCustomsConfirmed?"active":""}" data-value="yes"><span>Yes, confirmed</span></button>
+            <button type="button" class="choiceBtn ${!state.niCustomsConfirmed?"active":""}" data-value="no"><span>Not yet</span></button>
+          </div>
 
           ${showRMNISpecial && selectedRMRule.niRule === "live_creatures_forbidden" ? `
             <div class="banner danger show" style="display:block; margin-top:10px;">
@@ -3230,15 +3235,26 @@ function renderFilterAndPresentOptions(){
               </div>
             ` : ""}
           ` : ""}
-            ` : ""}
+          </div>
+            ` : `
+          <div class="card">
+            <h3>Northern Ireland / Windsor checks (KIOSK-867)</h3>
+            <div class="helpNote">Not required unless recipient postcode is in Northern Ireland (BT).</div>
+          </div>
+            `}
 
-            <label style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-weight:700;">
-              <input type="checkbox" id="proofDeliveryInput" ${state.proofOfDelivery ? "checked" : ""}/>
-              <span>Offer proof of delivery optional add-on (KIOSK-416)</span>
-            </label>
+          <div class="card">
+            <h3>Proof of delivery add-on (KIOSK-416)</h3>
+            <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Offer proof of delivery as an optional add-on.</p>
+            <div class="choiceRow" id="podChoices">
+              <button type="button" class="choiceBtn ${state.proofOfDelivery?"active":""}" data-value="yes"><span>Yes, add proof of delivery</span></button>
+              <button type="button" class="choiceBtn ${!state.proofOfDelivery?"active":""}" data-value="no"><span>No add-on</span></button>
+            </div>
+          </div>
 
-            ${needsEvriAdditional ? `
-          <h3 style="margin-top:14px;">EVRi/DPD additional screening</h3>
+          ${needsEvriAdditional ? `
+          <div class="card">
+          <h3>EVRi/DPD additional screening</h3>
           <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
             <button type="button" class="btn" id="openEvriScreeningBtn">
               <span class="material-symbols-outlined">fact_check</span>Open EVRi/DPD screening screens
@@ -3254,13 +3270,23 @@ function renderFilterAndPresentOptions(){
           ` : `
             <div class="banner warn show" style="display:block; margin-top:10px;">Complete EVRi/DPD screening screens before continuing.</div>
           `}
-            ` : ""}
           </div>
+            ` : `
+          <div class="card">
+            <h3>EVRi/DPD additional screening</h3>
+            <div class="helpNote">Not required for the selected product profile.</div>
+          </div>
+            `}
         </div>
       </div>
       <aside class="flowAside">
         <div class="flowNarrative">
           <h4>Journey Note</h4>
+          <p>Complete each section in order from top to bottom before adding to basket.</p>
+          <p>Confirm selected product first; use Change product to return to service selection.</p>
+          <p>Recipient and sender address details are mandatory.</p>
+          <p>${showNI ? "NI/Windsor checks are required for BT destinations." : "NI/Windsor checks are not required for current postcode."}</p>
+          <p>${needsEvriAdditional ? "EVRi/DPD additional screening is required for this product." : "EVRi/DPD additional screening is not required for this product."}</p>
           <p>${escapeHtml(narrativeSpeed)}</p>
           <p>${escapeHtml(narrativeRM)}</p>
           <p>${escapeHtml(narrativeNI)}</p>
@@ -3283,7 +3309,6 @@ function renderFilterAndPresentOptions(){
   const ra = document.getElementById("recipientAddressInput");
   const sp = document.getElementById("senderPostcodeInput");
   const sa = document.getElementById("senderAddressInput");
-  const pod = document.getElementById("proofDeliveryInput");
 
   bindKioskKeyboard(rp, { title:"Enter recipient postcode", maxLen:10, uppercase:true });
   bindKioskKeyboard(ra, { title:"Enter recipient address", maxLen:80, uppercase:false });
@@ -3332,17 +3357,26 @@ function renderFilterAndPresentOptions(){
     }
   });
   sa.addEventListener("input", (e)=>{ state.senderAddress = (e.target.value || "").slice(0, 80); e.target.value = state.senderAddress; });
-  pod.addEventListener("change", (e)=>{ state.proofOfDelivery = !!e.target.checked; });
+  const podChoices = document.querySelectorAll("#podChoices .choiceBtn");
+  podChoices.forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.proofOfDelivery = (btn.dataset.value || "") === "yes";
+      podChoices.forEach(b=>b.classList.toggle("active", b===btn));
+    });
+  });
 
   const niRef = document.getElementById("niReferenceInput");
-  const niConfirm = document.getElementById("niConfirmed");
   bindKioskKeyboard(niRef, { title:"Enter NI/Windsor reference", maxLen:40, uppercase:true });
   if(niRef){
     niRef.addEventListener("input", (e)=>{ state.niCustomsReference = (e.target.value || "").slice(0, 40); e.target.value = state.niCustomsReference; });
   }
-  if(niConfirm){
-    niConfirm.addEventListener("change", (e)=>{ state.niCustomsConfirmed = !!e.target.checked; });
-  }
+  const niConfirmChoices = document.querySelectorAll("#niConfirmChoices .choiceBtn");
+  niConfirmChoices.forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.niCustomsConfirmed = (btn.dataset.value || "") === "yes";
+      niConfirmChoices.forEach(b=>b.classList.toggle("active", b===btn));
+    });
+  });
   const niSpsChoices = document.querySelectorAll("#niSpsChoices .choiceBtn");
   niSpsChoices.forEach(btn=>{
     btn.addEventListener("click", ()=>{
