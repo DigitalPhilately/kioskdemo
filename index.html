@@ -118,6 +118,97 @@
       text-overflow:ellipsis;
       max-width:220px;
     }
+    .launchHeader{
+      margin:0 0 14px;
+      padding:16px 18px;
+      border:1px solid var(--border);
+      border-radius:16px;
+      background:#fff;
+      text-align:center;
+      color:#1d3350;
+      font-size:42px;
+      font-weight:900;
+    }
+    .launchGrid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:16px;
+    }
+    .launchTile{
+      border:1px solid var(--border);
+      border-radius:20px;
+      min-height:210px;
+      background:#f6f9ff;
+      color:#17344f;
+      display:flex;
+      align-items:center;
+      justify-content:flex-start;
+      gap:16px;
+      padding:24px;
+      cursor:pointer;
+      font-size:38px;
+      font-weight:900;
+      line-height:1.1;
+      text-align:left;
+      box-shadow:0 4px 12px rgba(20,40,74,.08);
+    }
+    .launchTile:hover{border-color:#a9bfdc;}
+    .launchTile:active{transform:translateY(1px);}
+    .launchTile .material-symbols-outlined{
+      font-size:68px;
+      color:#2a6ea5;
+      flex:0 0 auto;
+    }
+    .launchTile.active{
+      background:linear-gradient(145deg, #dff0ff, #eff7ff);
+      border-color:#7faed6;
+      box-shadow:0 0 0 4px rgba(46,122,184,.15);
+    }
+    .launchTile.disabled{
+      background:#f2f5fa;
+      color:#6d7890;
+      border-color:#d8e1ef;
+    }
+    .launchTile.disabled .material-symbols-outlined{
+      color:#8fa1bb;
+    }
+    .launchTile .sub{
+      display:block;
+      margin-top:8px;
+      font-size:19px;
+      font-weight:700;
+      color:var(--muted);
+    }
+    .screenRefreshOverlay{
+      position:absolute;
+      inset:0;
+      background:rgba(246,250,255,.96);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .14s ease;
+      z-index:90;
+    }
+    .screenRefreshOverlay.show{opacity:1;}
+    .screenRefreshCard{
+      border:1px solid var(--border);
+      border-radius:18px;
+      background:#fff;
+      padding:16px 22px;
+      color:#1f3653;
+      font-size:18px;
+      font-weight:900;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      box-shadow:0 8px 24px rgba(20,40,74,.10);
+    }
+    .screenRefreshCard .material-symbols-outlined{
+      font-size:24px;
+      color:var(--accent);
+    }
     .gridWrap{
       background:var(--panel);
       border:1px solid var(--border);
@@ -479,6 +570,11 @@
       .scalePromptTitle{font-size:30px;}
       .scalePromptText{font-size:18px;}
       .scalePromptArrow{font-size:24px;}
+      .launchHeader{font-size:28px;padding:12px;}
+      .launchGrid{grid-template-columns:1fr;gap:12px;}
+      .launchTile{min-height:130px;font-size:24px;padding:16px;}
+      .launchTile .material-symbols-outlined{font-size:44px;}
+      .launchTile .sub{font-size:14px;}
       .weightConfirmCard{grid-template-columns:1fr;padding:14px;}
       .weightCopy .label{font-size:17px;}
       .weightCopy .value{font-size:42px;}
@@ -536,7 +632,7 @@
    State
 ---------------------------- */
 const state = {
-  step: 1,                // 1..8
+  step: 0,                // 0 = launch screen, then 1..6
   weightG: "",
   format: "",
   destination: "",
@@ -1511,12 +1607,89 @@ const helpBtn = document.getElementById("helpBtn");
 function stepCount(){ return 6; }
 
 function updateProgress(){
-  progress.innerHTML = `Step ${state.step} of ${stepCount()} <span class="wireframeFlag">Journey wireframe only</span>`;
-  backBtn.disabled = (state.step === 1);
+  if(state.step === 0){
+    progress.innerHTML = `Start <span class="wireframeFlag">Journey wireframe only</span>`;
+  } else {
+    progress.innerHTML = `Step ${state.step} of ${stepCount()} <span class="wireframeFlag">Journey wireframe only</span>`;
+  }
+  backBtn.disabled = (state.step <= 0);
+}
+
+let isScreenTransitioning = false;
+function navigateToStep(targetStep){
+  const target = Math.max(0, Math.min(stepCount(), targetStep));
+  if(target === state.step){
+    render();
+    return;
+  }
+  if(isScreenTransitioning) return;
+  isScreenTransitioning = true;
+
+  const overlay = document.createElement("div");
+  overlay.className = "screenRefreshOverlay";
+  overlay.innerHTML = `
+    <div class="screenRefreshCard">
+      <span class="material-symbols-outlined">sync</span>
+      Loading next screen...
+    </div>
+  `;
+  const host = document.querySelector(".chrome");
+  host.appendChild(overlay);
+  requestAnimationFrame(()=> overlay.classList.add("show"));
+
+  window.setTimeout(()=>{
+    state.step = target;
+    render();
+    window.setTimeout(()=>{
+      overlay.remove();
+      isScreenTransitioning = false;
+    }, 120);
+  }, 180);
+}
+
+function renderLaunch(){
+  screen.innerHTML = `
+    <div class="launchHeader">What do you want to do today?</div>
+    <div class="launchGrid">
+      <button type="button" class="launchTile disabled" id="launchQrBtn">
+        <span class="material-symbols-outlined">qr_code_scanner</span>
+        <span>Scan QR code <span class="sub">Demo placeholder</span></span>
+      </button>
+      <button type="button" class="launchTile disabled" id="launchLabelBtn">
+        <span class="material-symbols-outlined">local_post_office</span>
+        <span>Scan pre-paid label <span class="sub">Demo placeholder</span></span>
+      </button>
+      <button type="button" class="launchTile active" id="launchPostBtn">
+        <span class="material-symbols-outlined">inventory_2</span>
+        <span>Post an item <span class="sub">Start postage journey</span></span>
+      </button>
+      <button type="button" class="launchTile disabled" id="launchStampsBtn">
+        <span class="material-symbols-outlined">shopping_cart</span>
+        <span>Purchase stamps <span class="sub">Demo placeholder</span></span>
+      </button>
+    </div>
+  `;
+
+  document.getElementById("launchPostBtn").addEventListener("click", ()=>{
+    navigateToStep(1);
+  });
+  ["launchQrBtn","launchLabelBtn","launchStampsBtn"].forEach(id => {
+    const btn = document.getElementById(id);
+    if(btn){
+      btn.addEventListener("click", ()=>{
+        alert("This option is not included in this wireframe. Use 'Post an item' to continue.");
+      });
+    }
+  });
 }
 
 function updateBreadcrumb(){
   if(!crumbBar) return;
+  if(state.step === 0){
+    crumbBar.style.display = "none";
+    return;
+  }
+  crumbBar.style.display = "flex";
   const service = selectedService();
   const fmt = ({ letter:"Letter", large_letter:"Large letter", parcel:"Parcel" })[state.format] || "Not set";
   const dest = state.destination === "uk" ? "UK (Inc NI)" : (state.destination === "intl" ? "International" : "Not set");
@@ -1575,8 +1748,13 @@ function render(){
   applyQuickDemoDefaults();
   setDestinationPill();
   updateProgress();
+  const destPill = document.getElementById("destPill");
+  if(destPill){
+    destPill.style.display = state.step === 0 ? "none" : "inline-flex";
+  }
 
-  if(state.step === 1) renderWeigh();
+  if(state.step === 0) renderLaunch();
+  else if(state.step === 1) renderWeigh();
   else if(state.step === 2) renderRMDangerous();
   else if(state.step === 3) renderCaptureItemDetails();
   else if(state.step === 4) renderFilterAndPresentOptions();
@@ -1585,7 +1763,7 @@ function render(){
   updateBreadcrumb();
 
   // Hide primary footer action on in-screen tap flows.
-  if(state.step === 1 || state.step === 2 || (state.step === 4 && state.evriScreeningOpen)){
+  if(state.step === 0 || state.step === 1 || state.step === 2 || (state.step === 4 && state.evriScreeningOpen)){
     nextBtn.style.visibility = "hidden";
     nextBtn.style.pointerEvents = "none";
   } else {
@@ -1969,8 +2147,7 @@ function wireRMDangerousDetails(list){
     const hasRequirements = requirements.checks.length > 0 || requirements.limits.length > 0;
     if(!hasRequirements){
       state.rmConditionSatisfied = true;
-      state.step = 3;
-      render();
+      navigateToStep(3);
       return;
     }
 
@@ -1979,8 +2156,7 @@ function wireRMDangerousDetails(list){
       const quickDemoErrors = validateRMConditionCapture(item);
       if(!quickDemoErrors.length){
         state.rmConditionSatisfied = true;
-        state.step = 3;
-        render();
+        navigateToStep(3);
         return;
       }
     }
@@ -2071,8 +2247,7 @@ function wireRMDangerousDetails(list){
         return;
       }
       state.rmConditionSatisfied = true;
-      state.step = 3;
-      render();
+      navigateToStep(3);
     });
 
     details.classList.add("show");
@@ -2094,8 +2269,7 @@ function wireRMDangerousDetails(list){
         state.rmOtherSelected = true;
         state.rmConditionSatisfied = true;
         clearDetailsPanel();
-        state.step = 3;
-        render();
+        navigateToStep(3);
         return;
       }
 
@@ -3099,7 +3273,7 @@ function wireProhibitedDetails(list){
     details.classList.remove("show");
     document.querySelectorAll('.tile[data-mode="p"]').forEach(b=>b.classList.remove("selected"));
   });
-  back.addEventListener("click", ()=>{ state.step = 1; render(); });
+  back.addEventListener("click", ()=> navigateToStep(1));
   reset.addEventListener("click", ()=> resetAll());
 }
 
@@ -3137,6 +3311,7 @@ function wireMultiSelectDetails(mode, list, setRef, detailsMode="r"){
    Navigation rules
 ---------------------------- */
 function canContinue(){
+  if(state.step === 0) return false;
   if(state.step === 1) return !!state.weightG && !!state.destination;
 
   if(state.step === 2){
@@ -3233,17 +3408,15 @@ function next(){
     state.basketAdded = true;
   }
 
-  if(state.step < stepCount()) state.step += 1;
-  render();
+  if(state.step < stepCount()) navigateToStep(state.step + 1);
 }
 
 function back(){
-  if(state.step > 1) state.step -= 1;
-  render();
+  if(state.step > 0) navigateToStep(state.step - 1);
 }
 
 function resetAll(){
-  state.step = 1;
+  state.step = 0;
   state.weightG = "";
   state.format = "";
   state.destination = "";
