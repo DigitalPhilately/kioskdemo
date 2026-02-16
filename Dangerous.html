@@ -74,22 +74,46 @@
     h1{margin:4px 0 4px;font-size:34px;letter-spacing:.2px;color:#2a2550;}
     .subtitle{color:var(--muted);margin:0 0 16px;font-size:16px;}
     .stepHeader{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px;}
-    .stepPills{
-      display:flex;
-      gap:8px;
-      align-items:center;
-      justify-content:flex-end;
-      flex-wrap:wrap;
-    }
     .pill{
       display:inline-flex;gap:8px;align-items:center;
       padding:8px 12px;border-radius:999px;border:1px solid var(--border);
       background:var(--panel);color:#2b2a44;font-weight:800;font-size:13px;
     }
-    .wireframeHeaderPill{
-      border-color:#f1d6a8;
-      background:#fff5df;
-      color:#7b4f00;
+    .crumbBar{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      padding:10px 20px;
+      border-bottom:1px solid var(--border);
+      background:#f9faff;
+    }
+    .crumbPill{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:#fff;
+      color:#2a2550;
+      font-size:12px;
+      font-weight:800;
+      max-width:100%;
+    }
+    .crumbPill .material-symbols-outlined{
+      font-size:16px;
+      color:#6357a3;
+    }
+    .crumbLabel{
+      color:var(--muted);
+      font-weight:800;
+      white-space:nowrap;
+    }
+    .crumbValue{
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width:220px;
     }
     .gridWrap{
       background:var(--panel);
@@ -324,6 +348,8 @@
       .formRow{grid-template-columns:1fr;}
       .flowShell{grid-template-columns:1fr;}
       .summary{grid-template-columns:1fr;}
+      .crumbBar{padding:8px 12px;}
+      .crumbValue{max-width:150px;}
       .choiceRow3{grid-template-columns:1fr;}
       .tile{padding:10px;}
       .tile .icon{width:46px;height:46px;border-radius:12px;}
@@ -350,6 +376,8 @@
         <button class="btn" id="helpBtn">Help <span class="material-symbols-outlined">help</span></button>
       </div>
     </div>
+
+    <div class="crumbBar" id="crumbBar"></div>
 
     <div class="content" id="screen"></div>
 
@@ -1331,6 +1359,7 @@ function applyQuickDemoDefaults(){
 ---------------------------- */
 const screen = document.getElementById("screen");
 const progress = document.getElementById("progress");
+const crumbBar = document.getElementById("crumbBar");
 const nextBtn = document.getElementById("nextBtn");
 const backBtn = document.getElementById("backBtn");
 const resetBtn = document.getElementById("resetBtn");
@@ -1344,29 +1373,46 @@ function updateProgress(){
   backBtn.disabled = (state.step === 1);
 }
 
-function ensureHeaderWireframePill(){
-  const header = screen.querySelector(".stepHeader");
-  if(!header) return;
+function updateBreadcrumb(){
+  if(!crumbBar) return;
+  const service = selectedService();
+  const fmt = ({ letter:"Letter", large_letter:"Large letter", parcel:"Parcel" })[state.format] || "Not set";
+  const dest = state.destination === "uk" ? "UK (Inc NI)" : (state.destination === "intl" ? "International" : "Not set");
+  const rmRule = currentRMRule();
+  const rmDg = state.rmOtherSelected
+    ? "Other / not listed"
+    : (rmRule ? rmRule.label : "Not set");
+  const value = numericValue(state.declaredValue) > 0
+    ? `£${numericValue(state.declaredValue).toFixed(2)}`
+    : "Not set";
+  const speed = state.destination === "uk"
+    ? deliveryPreferenceLabel(state.deliverySpeed || "")
+    : "Skipped (Intl)";
+  const niNeeded = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
+  const niStatus = niNeeded ? (state.niCustomsConfirmed ? "Captured" : "Pending") : "N/A";
+  const carrierStatus = service && service.profile === "evri_dpd"
+    ? (state.evriScreeningComplete ? "Screened" : "Pending")
+    : "N/A";
 
-  let pills = header.querySelector(".stepPills");
-  if(!pills){
-    const primaryPill = header.querySelector(":scope > .pill");
-    pills = document.createElement("div");
-    pills.className = "stepPills";
-    if(primaryPill){
-      primaryPill.replaceWith(pills);
-      pills.appendChild(primaryPill);
-    } else {
-      header.appendChild(pills);
-    }
-  }
+  const crumbs = [
+    { icon:"scale", label:"Weight", value: state.weightG ? `${state.weightG} g` : "Not set" },
+    { icon:"public", label:"Destination", value: dest },
+    { icon:"dangerous", label:"RM DG", value: rmDg },
+    { icon:"straighten", label:"Format", value: fmt },
+    { icon:"payments", label:"Value", value },
+    { icon:"bolt", label:"Speed", value: speed },
+    { icon:"local_shipping", label:"Service", value: service ? service.name : "Not set" },
+    { icon:"location_on", label:"NI/Windsor", value: niStatus },
+    { icon:"fact_check", label:"EVRi/DPD", value: carrierStatus }
+  ];
 
-  if(!pills.querySelector(".wireframeHeaderPill")){
-    const wireframePill = document.createElement("span");
-    wireframePill.className = "pill wireframeHeaderPill";
-    wireframePill.innerHTML = `<span class="material-symbols-outlined">warning</span>Journey wireframe only`;
-    pills.appendChild(wireframePill);
-  }
+  crumbBar.innerHTML = crumbs.map(item => `
+    <span class="crumbPill">
+      <span class="material-symbols-outlined">${item.icon}</span>
+      <span class="crumbLabel">${escapeHtml(item.label)}:</span>
+      <span class="crumbValue">${escapeHtml(item.value)}</span>
+    </span>
+  `).join("");
 }
 
 function render(){
@@ -1380,7 +1426,7 @@ function render(){
   else if(state.step === 4) renderFilterAndPresentOptions();
   else if(state.step === 5) renderBasketAndPay();
   else renderPrintAndConfirm();
-  ensureHeaderWireframePill();
+  updateBreadcrumb();
 
   // Hide primary footer action on in-screen tap flows.
   if(state.step === 2 || (state.step === 4 && state.evriScreeningOpen)){
