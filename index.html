@@ -990,10 +990,12 @@ const state = {
   evriScreeningOpen: false,
   evriAdditionalSelection: "",
   evriSelectedProhibitedKey: null,
+  evriProhibitedGroupKey: "",
   evriAdditionalBlocked: false,
   evriScreeningComplete: false,
   evriLossOnlySelected: false,
   evriNoCompSelected: false,
+  evriCompPicker: "",
   rmAdvisoryKeys: new Set(),
   restrictedKeys: new Set(),
   coverLossOnlyKeys: new Set(),
@@ -1098,6 +1100,46 @@ const PROHIBITED = [
 
   { key:"geochron", label:"Geochron", icon:"public",
     details:"Geochron items cannot be carried on any service." },
+];
+
+// Grouped EVRi/DPD prohibited categories to keep first-pass screening concise.
+const EVRI_PROHIBITED_GROUPS = [
+  {
+    key:"evpg_animals_food",
+    label:"Animals, food or perishables",
+    prompt:"Select the exact prohibited item category.",
+    itemKeys:["animals","food_all","perishables"]
+  },
+  {
+    key:"evpg_batteries_medical",
+    label:"Batteries, biological, medical",
+    prompt:"Select the exact prohibited item category.",
+    itemKeys:["batteries","bio_samples","medical_equipment"]
+  },
+  {
+    key:"evpg_gases_hazardous",
+    label:"Gases, hazardous or liquids",
+    prompt:"Select the exact prohibited item category.",
+    itemKeys:["cylinders","hazardous","liquids_gels"]
+  },
+  {
+    key:"evpg_illegal_controlled",
+    label:"Illegal, controlled or financial",
+    prompt:"Select the exact prohibited item category.",
+    itemKeys:["illegal","drugs_tobacco","money_docs","geochron"]
+  },
+  {
+    key:"evpg_toxic_radioactive",
+    label:"Toxic, poisons or radioactive",
+    prompt:"Select the exact prohibited item category.",
+    itemKeys:["poisons","radioactive"]
+  },
+  {
+    key:"evpg_vehicles_weapons",
+    label:"Vehicle parts, weapons, white goods",
+    prompt:"Select the exact prohibited item category.",
+    itemKeys:["vehicle_parts_large","weapons","white_goods"]
+  }
 ];
 
 // RESTRICTED (allowed with conditions) — placeholders (swap with your real restricted catalogue)
@@ -1700,10 +1742,12 @@ function applyDestinationSelection(value){
   state.evriScreeningOpen = false;
   state.evriAdditionalSelection = "";
   state.evriSelectedProhibitedKey = null;
+  state.evriProhibitedGroupKey = "";
   state.evriAdditionalBlocked = false;
   state.evriScreeningComplete = false;
   state.evriLossOnlySelected = false;
   state.evriNoCompSelected = false;
+  state.evriCompPicker = "";
   resetMulticarrierCompensationState();
   setDestinationPill();
 }
@@ -1735,6 +1779,8 @@ function setQuickDemoPreset(mode){
   if(!chosen || chosen.profile !== "evri_dpd"){
     state.senderPostcode = "";
     state.senderAddress = "";
+    state.evriProhibitedGroupKey = "";
+    state.evriCompPicker = "";
     resetMulticarrierCompensationState();
   }
 }
@@ -2227,6 +2273,7 @@ function applyQuickDemoDefaults(){
     if(!state.evriAdditionalSelection && !state.evriSelectedProhibitedKey){
       state.evriAdditionalSelection = "clear";
       state.evriSelectedProhibitedKey = null;
+      state.evriProhibitedGroupKey = "";
       state.evriAdditionalBlocked = false;
     }
     state.evriLossOnlySelected = state.coverLossOnlyKeys.size > 0;
@@ -2234,6 +2281,8 @@ function applyQuickDemoDefaults(){
   } else if(selected && selected.profile !== "evri_dpd"){
     state.senderPostcode = "";
     state.senderAddress = "";
+    state.evriProhibitedGroupKey = "";
+    state.evriCompPicker = "";
     resetMulticarrierCompensationState();
   }
 
@@ -2732,10 +2781,16 @@ function renderWeigh(){
     state.selectedServiceId = "";
     state.productProfile = "royal_mail";
     state.evriAdditionalSelection = "";
+    state.evriSelectedProhibitedKey = null;
+    state.evriProhibitedGroupKey = "";
     state.evriAdditionalBlocked = false;
     state.evriScreeningComplete = false;
     state.evriLossOnlySelected = false;
     state.evriNoCompSelected = false;
+    state.evriCompPicker = "";
+    state.coverLossOnlyKeys = new Set();
+    state.coverNoCompKeys = new Set();
+    resetMulticarrierCompensationState();
   };
 
   const weightInlineInput = document.getElementById("weightInlineInput");
@@ -3346,76 +3401,126 @@ function renderCaptureItemDetails(){
 }
 
 function renderEvriAdditionalScreening(){
-  const prohibitedList = padTo25([
-    ...PROHIBITED,
-    {
-      key:"evri_other_not_listed",
-      label:"Other / not listed",
-      icon:"check_circle",
-      details:"Select this if your item does not match any prohibited category."
-    }
-  ]);
-  const lossList = padTo25(LOSS_ONLY);
-  const noCompList = padTo25(NO_COMP);
-  const prohibitedLabel = state.evriSelectedProhibitedKey
-    ? (PROHIBITED.find(x => x.key === state.evriSelectedProhibitedKey)?.label || state.evriSelectedProhibitedKey)
-    : "Other / not listed";
+  const prohibitedGroups = EVRI_PROHIBITED_GROUPS.map(group => ({
+    ...group,
+    items: group.itemKeys
+      .map(key => PROHIBITED.find(item => item.key === key))
+      .filter(Boolean)
+  }));
+  const selectedGroup = prohibitedGroups.find(group => group.key === state.evriProhibitedGroupKey) || null;
+  const selectedProhibitedItem = PROHIBITED.find(item => item.key === state.evriSelectedProhibitedKey) || null;
+  const lossLabels = [...state.coverLossOnlyKeys]
+    .map(key => LOSS_ONLY.find(item => item.key === key)?.label)
+    .filter(Boolean);
+  const noCompLabels = [...state.coverNoCompKeys]
+    .map(key => NO_COMP.find(item => item.key === key)?.label)
+    .filter(Boolean);
+  const showLossPicker = state.evriCompPicker === "loss" || state.coverLossOnlyKeys.size > 0;
+  const showNoCompPicker = state.evriCompPicker === "no_comp" || state.coverNoCompKeys.size > 0;
+  const prohibitedBanner = state.evriAdditionalSelection === "blocked"
+    ? `<div class="banner danger show" style="display:block; margin-top:10px;">Prohibited item selected: ${escapeHtml(selectedProhibitedItem ? selectedProhibitedItem.label : "Category selected")}.</div>`
+    : state.evriAdditionalSelection === "clear"
+    ? `<div class="banner ok show" style="display:block; margin-top:10px;">No prohibited item selected (Other / not listed).</div>`
+    : `<div class="banner warn show" style="display:block; margin-top:10px;">Select a prohibited outcome before confirming screening.</div>`;
 
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
         <h1>EVRi/DPD additional screening</h1>
-        <p class="subtitle">Carrier-specific checks for EVRi/DPD products.</p>
+        <p class="subtitle">Reduced first-pass view: choose group first, then specific category only when needed.</p>
       </div>
       <span class="pill"><span class="material-symbols-outlined">policy</span> Additional carrier checks</span>
     </div>
 
     <div class="flowShell">
       <div class="flowMain">
-        <div class="card" style="margin-bottom:14px;">
-          <h3>Prohibited categories (EVRi/DPD)</h3>
-          <div class="gridWrap">
-            <div class="grid" id="evriProhibitedGrid"></div>
-            <div class="details" id="evriProhibitedDetails">
-              <div class="detailsTop">
-                <div class="detailsTitle" id="evriProhibitedDetailsTitle"></div>
-                <button class="btn" id="evriProhibitedClose"><span class="material-symbols-outlined">close</span>Close</button>
-              </div>
-              <div class="detailsText" id="evriProhibitedDetailsText"></div>
-              <div class="banner" id="evriProhibitedBanner"></div>
-            </div>
+        <div class="card">
+          <h3>1) Prohibited check (required)</h3>
+          <p>Select the relevant prohibited group. Then choose the exact category.</p>
+          <div class="choiceGroup" id="evriProhibitedGroupChoices">
+            ${prohibitedGroups.map(group => `
+              <button type="button" class="choiceBtn ${state.evriProhibitedGroupKey===group.key ? "active" : ""}" data-group-key="${escapeHtml(group.key)}">
+                <span>${escapeHtml(group.label)}</span>
+                <span class="sub">Open options</span>
+              </button>
+            `).join("")}
           </div>
+          <div class="choiceRow" style="margin-top:10px;">
+            <button type="button" class="choiceBtn ${state.evriAdditionalSelection==="clear" ? "active" : ""}" id="evriOtherNotListedBtn">
+              <span>Other / not listed</span>
+            </button>
+          </div>
+
+          ${selectedGroup ? `
+            <h3 style="margin-top:14px;">Tell us what is inside</h3>
+            <p style="margin:0 0 10px; color:var(--muted); font-size:13px;">${escapeHtml(selectedGroup.prompt || "Select the exact prohibited item.")}</p>
+            <div class="choiceGroup" id="evriProhibitedItemChoices">
+              ${selectedGroup.items.map(item => `
+                <button type="button" class="choiceBtn ${state.evriSelectedProhibitedKey===item.key ? "active" : ""}" data-item-key="${escapeHtml(item.key)}">
+                  <span>${escapeHtml(item.label)}</span>
+                </button>
+              `).join("")}
+            </div>
+            ${selectedProhibitedItem ? `
+              <div class="helpNote" style="margin-top:10px;">${escapeHtml(selectedProhibitedItem.details)}</div>
+            ` : ""}
+          ` : ""}
+
+          ${prohibitedBanner}
         </div>
 
-        <div class="formRow">
-          <div class="card">
-            <h3>Loss-only compensation categories</h3>
-            <div class="gridWrap">
-              <div class="grid" id="evriLossGrid"></div>
-            </div>
-          </div>
-          <div class="card">
-            <h3>No-compensation categories</h3>
-            <div class="gridWrap">
-              <div class="grid" id="evriNoCompGrid"></div>
-            </div>
-          </div>
-        </div>
+        <div class="card" style="margin-top:14px;">
+          <h3>2) Compensation flags (optional)</h3>
+          <p>Only open these lists if the item is in a listed compensation category.</p>
 
-        <div class="details" id="evriCompDetails">
-          <div class="detailsTop">
-            <div class="detailsTitle" id="evriCompDetailsTitle"></div>
-            <button class="btn" id="evriCompClose"><span class="material-symbols-outlined">close</span>Close</button>
+          <h3 style="margin-top:10px;">Loss-only categories</h3>
+          <div class="choiceRow">
+            <button type="button" class="choiceBtn ${!state.coverLossOnlyKeys.size ? "active" : ""}" id="evriLossNoneBtn">
+              <span>No loss-only categories</span>
+            </button>
+            <button type="button" class="choiceBtn ${showLossPicker ? "active" : ""}" id="evriLossSelectBtn">
+              <span>Select loss-only categories</span>
+            </button>
           </div>
-          <div class="detailsText" id="evriCompDetailsText"></div>
-          <div class="banner warn show" style="display:block; margin-top:10px;">
-            This affects compensation eligibility on EVRi/DPD services.
+          ${showLossPicker ? `
+            <div class="choiceGroup" id="evriLossChoices" style="margin-top:10px;">
+              ${LOSS_ONLY.map(item => `
+                <button type="button" class="choiceBtn ${state.coverLossOnlyKeys.has(item.key) ? "active" : ""}" data-loss-key="${escapeHtml(item.key)}">
+                  <span>${escapeHtml(item.label)}</span>
+                </button>
+              `).join("")}
+            </div>
+          ` : ""}
+          ${lossLabels.length ? `
+            <div class="helpNote" style="margin-top:10px;">Loss-only selected: ${escapeHtml(lossLabels.join(", "))}</div>
+          ` : ""}
+
+          <h3 style="margin-top:14px;">No-compensation categories</h3>
+          <div class="choiceRow">
+            <button type="button" class="choiceBtn ${!state.coverNoCompKeys.size ? "active" : ""}" id="evriNoCompNoneBtn">
+              <span>No no-comp categories</span>
+            </button>
+            <button type="button" class="choiceBtn ${showNoCompPicker ? "active" : ""}" id="evriNoCompSelectBtn">
+              <span>Select no-comp categories</span>
+            </button>
           </div>
+          ${showNoCompPicker ? `
+            <div class="choiceGroup" id="evriNoCompChoices" style="margin-top:10px;">
+              ${NO_COMP.map(item => `
+                <button type="button" class="choiceBtn ${state.coverNoCompKeys.has(item.key) ? "active" : ""}" data-nocomp-key="${escapeHtml(item.key)}">
+                  <span>${escapeHtml(item.label)}</span>
+                </button>
+              `).join("")}
+            </div>
+          ` : ""}
+          ${noCompLabels.length ? `
+            <div class="helpNote" style="margin-top:10px;">No-comp selected: ${escapeHtml(noCompLabels.join(", "))}</div>
+          ` : ""}
         </div>
 
         <div class="card" style="margin-top:14px;">
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <span class="tag"><span class="material-symbols-outlined">report</span>${escapeHtml(state.evriAdditionalSelection === "blocked" ? `Prohibited: ${prohibitedLabel}` : "Prohibited: Other / not listed")}</span>
+            <span class="tag"><span class="material-symbols-outlined">report</span>${escapeHtml(state.evriAdditionalSelection === "blocked" ? `Prohibited: ${selectedProhibitedItem ? selectedProhibitedItem.label : "Selected"}` : "Prohibited: Other / not listed")}</span>
             <span class="tag"><span class="material-symbols-outlined">package_2</span>Loss-only: ${state.coverLossOnlyKeys.size ? "Yes" : "No"}</span>
             <span class="tag"><span class="material-symbols-outlined">gpp_bad</span>No-comp: ${state.coverNoCompKeys.size ? "Yes" : "No"}</span>
           </div>
@@ -3423,116 +3528,111 @@ function renderEvriAdditionalScreening(){
             <button class="btn" id="evriScreeningBack"><span class="material-symbols-outlined">arrow_back</span>Back to sender details</button>
             <button class="btn primary" id="evriScreeningConfirm"><span class="material-symbols-outlined">task_alt</span>Confirm EVRi/DPD screening</button>
           </div>
-          ${state.evriAdditionalSelection === "blocked" ? `
-            <div class="banner danger show" style="display:block; margin-top:10px;">EVRi/DPD prohibited item selected. Choose a different service or change selection.</div>
-          ` : state.evriAdditionalSelection === "clear" ? `
-            <div class="banner ok show" style="display:block; margin-top:10px;">EVRi/DPD additional screening currently clear.</div>
-          ` : `
-            <div class="banner warn show" style="display:block; margin-top:10px;">Select a prohibited outcome to complete screening.</div>
-          `}
         </div>
       </div>
       <aside class="flowAside">
         <div class="flowNarrative">
           <h4>Journey Note</h4>
-          <p>Select one prohibited outcome first. Use <strong>Other / not listed</strong> for clear items.</p>
-          <p>Loss-only and no-compensation categories are optional multi-select flags for compensation handling.</p>
-          <p>Confirm screening to continue to basket.</p>
+          <p>Step 1: select prohibited group, then exact item (or choose Other / not listed).</p>
+          <p>Step 2: loss-only and no-comp lists are optional and only open when needed.</p>
+          <p>Confirm screening to continue.</p>
         </div>
       </aside>
     </div>
   `;
 
-  const prohibitedGrid = document.getElementById("evriProhibitedGrid");
-  prohibitedList.forEach(item => prohibitedGrid.appendChild(tileEl(item, "evriProhibited")));
+  document.querySelectorAll("#evriProhibitedGroupChoices .choiceBtn[data-group-key]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.evriProhibitedGroupKey = btn.dataset.groupKey || "";
+      state.evriAdditionalSelection = "";
+      state.evriSelectedProhibitedKey = null;
+      state.evriAdditionalBlocked = false;
+      state.evriScreeningComplete = false;
+      render();
+    });
+  });
 
-  if(state.evriAdditionalSelection === "clear"){
-    const otherTile = prohibitedGrid.querySelector('.tile[data-key="evri_other_not_listed"]');
-    if(otherTile) otherTile.classList.add("selected");
-  } else if(state.evriSelectedProhibitedKey){
-    const selectedTile = prohibitedGrid.querySelector(`.tile[data-key="${state.evriSelectedProhibitedKey}"]`);
-    if(selectedTile) selectedTile.classList.add("selected");
+  const evriOtherNotListedBtn = document.getElementById("evriOtherNotListedBtn");
+  if(evriOtherNotListedBtn){
+    evriOtherNotListedBtn.addEventListener("click", ()=>{
+      state.evriProhibitedGroupKey = "";
+      state.evriAdditionalSelection = "clear";
+      state.evriSelectedProhibitedKey = null;
+      state.evriAdditionalBlocked = false;
+      state.evriScreeningComplete = false;
+      render();
+    });
   }
 
-  const pDetails = document.getElementById("evriProhibitedDetails");
-  const pTitle = document.getElementById("evriProhibitedDetailsTitle");
-  const pText = document.getElementById("evriProhibitedDetailsText");
-  const pBanner = document.getElementById("evriProhibitedBanner");
-  const pClose = document.getElementById("evriProhibitedClose");
-
-  document.querySelectorAll('.tile[data-mode="evriProhibited"]').forEach(btn=>{
+  document.querySelectorAll("#evriProhibitedItemChoices .choiceBtn[data-item-key]").forEach(btn=>{
     btn.addEventListener("click", ()=>{
-      const key = btn.dataset.key;
-      const item = prohibitedList.find(x=>x.key===key);
-      if(!item) return;
-
-      document.querySelectorAll('.tile[data-mode="evriProhibited"]').forEach(b=>b.classList.remove("selected"));
-      btn.classList.add("selected");
-
-      pTitle.innerHTML = `
-        <div class="icon"><span class="material-symbols-outlined">${item.icon || "block"}</span></div>
-        ${escapeHtml(item.label)}
-      `;
-      pText.textContent = item.details || "";
-      pBanner.className = "banner show";
-
-      if(key === "evri_other_not_listed"){
-        state.evriAdditionalSelection = "clear";
-        state.evriSelectedProhibitedKey = null;
-        state.evriAdditionalBlocked = false;
-        pBanner.classList.add("ok");
-        pBanner.textContent = "No EVRi/DPD prohibited category selected.";
-      } else {
-        state.evriAdditionalSelection = "blocked";
-        state.evriSelectedProhibitedKey = key;
-        state.evriAdditionalBlocked = true;
-        pBanner.classList.add("danger");
-        pBanner.textContent = "This is treated as prohibited for EVRi/DPD screening.";
-      }
+      state.evriSelectedProhibitedKey = btn.dataset.itemKey || null;
+      state.evriAdditionalSelection = "blocked";
+      state.evriAdditionalBlocked = true;
       state.evriScreeningComplete = false;
-      pDetails.classList.add("show");
+      render();
     });
   });
 
-  pClose.addEventListener("click", ()=>{
-    pDetails.classList.remove("show");
-  });
+  const evriLossNoneBtn = document.getElementById("evriLossNoneBtn");
+  if(evriLossNoneBtn){
+    evriLossNoneBtn.addEventListener("click", ()=>{
+      state.coverLossOnlyKeys = new Set();
+      state.evriLossOnlySelected = false;
+      if(state.evriCompPicker === "loss") state.evriCompPicker = "";
+      state.evriScreeningComplete = false;
+      render();
+    });
+  }
 
-  const lossGrid = document.getElementById("evriLossGrid");
-  lossList.forEach(item => lossGrid.appendChild(tileEl(item, "evriLoss", true)));
-  wireMultiSelectDetails("evriLoss", lossList, state.coverLossOnlyKeys, "evriComp");
+  const evriLossSelectBtn = document.getElementById("evriLossSelectBtn");
+  if(evriLossSelectBtn){
+    evriLossSelectBtn.addEventListener("click", ()=>{
+      state.evriCompPicker = state.evriCompPicker === "loss" ? "" : "loss";
+      render();
+    });
+  }
 
-  const noCompGrid = document.getElementById("evriNoCompGrid");
-  noCompList.forEach(item => noCompGrid.appendChild(tileEl(item, "evriNc", true)));
-  wireMultiSelectDetails("evriNc", noCompList, state.coverNoCompKeys, "evriComp");
-
-  state.coverLossOnlyKeys.forEach(key=>{
-    const btn = document.querySelector(`.tile[data-mode="evriLoss"][data-key="${key}"]`);
-    if(btn) btn.classList.add("selected");
-  });
-  state.coverNoCompKeys.forEach(key=>{
-    const btn = document.querySelector(`.tile[data-mode="evriNc"][data-key="${key}"]`);
-    if(btn) btn.classList.add("selected");
-  });
-
-  document.querySelectorAll('.tile[data-mode="evriLoss"], .tile[data-mode="evriNc"]').forEach(btn=>{
+  document.querySelectorAll("#evriLossChoices .choiceBtn[data-loss-key]").forEach(btn=>{
     btn.addEventListener("click", ()=>{
+      const key = btn.dataset.lossKey || "";
+      if(!key) return;
+      if(state.coverLossOnlyKeys.has(key)) state.coverLossOnlyKeys.delete(key);
+      else state.coverLossOnlyKeys.add(key);
       state.evriLossOnlySelected = state.coverLossOnlyKeys.size > 0;
+      state.evriScreeningComplete = false;
+      render();
+    });
+  });
+
+  const evriNoCompNoneBtn = document.getElementById("evriNoCompNoneBtn");
+  if(evriNoCompNoneBtn){
+    evriNoCompNoneBtn.addEventListener("click", ()=>{
+      state.coverNoCompKeys = new Set();
+      state.evriNoCompSelected = false;
+      if(state.evriCompPicker === "no_comp") state.evriCompPicker = "";
+      state.evriScreeningComplete = false;
+      render();
+    });
+  }
+
+  const evriNoCompSelectBtn = document.getElementById("evriNoCompSelectBtn");
+  if(evriNoCompSelectBtn){
+    evriNoCompSelectBtn.addEventListener("click", ()=>{
+      state.evriCompPicker = state.evriCompPicker === "no_comp" ? "" : "no_comp";
+      render();
+    });
+  }
+
+  document.querySelectorAll("#evriNoCompChoices .choiceBtn[data-nocomp-key]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const key = btn.dataset.nocompKey || "";
+      if(!key) return;
+      if(state.coverNoCompKeys.has(key)) state.coverNoCompKeys.delete(key);
+      else state.coverNoCompKeys.add(key);
       state.evriNoCompSelected = state.coverNoCompKeys.size > 0;
       state.evriScreeningComplete = false;
-    });
-  });
-
-  document.getElementById("evriCompClose").addEventListener("click", ()=>{
-    document.getElementById("evriCompDetails").classList.remove("show");
-    document.querySelectorAll('.tile[data-mode="evriLoss"], .tile[data-mode="evriNc"]').forEach(b=>b.classList.remove("selected"));
-    state.coverLossOnlyKeys.forEach(key=>{
-      const btn = document.querySelector(`.tile[data-mode="evriLoss"][data-key="${key}"]`);
-      if(btn) btn.classList.add("selected");
-    });
-    state.coverNoCompKeys.forEach(key=>{
-      const btn = document.querySelector(`.tile[data-mode="evriNc"][data-key="${key}"]`);
-      if(btn) btn.classList.add("selected");
+      render();
     });
   });
 
@@ -3592,20 +3692,24 @@ function renderFilterAndPresentOptions(){
       state.evriScreeningOpen = false;
       state.evriAdditionalSelection = "";
       state.evriSelectedProhibitedKey = null;
+      state.evriProhibitedGroupKey = "";
       state.evriAdditionalBlocked = false;
       state.evriScreeningComplete = false;
       state.evriLossOnlySelected = false;
       state.evriNoCompSelected = false;
+      state.evriCompPicker = "";
       state.coverLossOnlyKeys = new Set();
       state.coverNoCompKeys = new Set();
     } else if(state.productProfile === "evri_dpd"){
       state.evriScreeningOpen = false;
       state.evriAdditionalSelection = "";
       state.evriSelectedProhibitedKey = null;
+      state.evriProhibitedGroupKey = "";
       state.evriAdditionalBlocked = false;
       state.evriScreeningComplete = false;
       state.evriLossOnlySelected = false;
       state.evriNoCompSelected = false;
+      state.evriCompPicker = "";
       state.coverLossOnlyKeys = new Set();
       state.coverNoCompKeys = new Set();
     }
@@ -4372,10 +4476,12 @@ function renderBasketAndPay(){
       state.evriScreeningOpen = false;
       state.evriAdditionalSelection = "";
       state.evriSelectedProhibitedKey = null;
+      state.evriProhibitedGroupKey = "";
       state.evriAdditionalBlocked = false;
       state.evriScreeningComplete = false;
       state.evriLossOnlySelected = false;
       state.evriNoCompSelected = false;
+      state.evriCompPicker = "";
       state.coverLossOnlyKeys = new Set();
       state.coverNoCompKeys = new Set();
       resetMulticarrierCompensationState();
@@ -4954,10 +5060,12 @@ function resetAll(){
   state.evriScreeningOpen = false;
   state.evriAdditionalSelection = "";
   state.evriSelectedProhibitedKey = null;
+  state.evriProhibitedGroupKey = "";
   state.evriAdditionalBlocked = false;
   state.evriScreeningComplete = false;
   state.evriLossOnlySelected = false;
   state.evriNoCompSelected = false;
+  state.evriCompPicker = "";
   state.rmAdvisoryKeys = new Set();
   state.restrictedKeys = new Set();
   state.coverLossOnlyKeys = new Set();
