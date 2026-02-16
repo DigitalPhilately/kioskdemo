@@ -1001,6 +1001,7 @@ const state = {
   manualWeightEditOpen: false,
   declaredValue: "",
   contentDescription: "",
+  contentsCategoryKey: "",
   deliverySpeed: "",
   recipientPostcode: "",
   recipientAddress: "",
@@ -1019,6 +1020,12 @@ const state = {
   rmNiPerishableRoute: "",
   rmNiPlantCertRef: "",
   proofOfDelivery: false,
+  multicarrierCompOutcome: "",
+  multicarrierCompWarningShown: false,
+  multicarrierCompAcknowledged: false,
+  multicarrierCompReason: "",
+  multicarrierCompServiceId: "",
+  multicarrierCompCategoryKey: "",
   selectedServiceId: "",
   filterFlowStage: "service",
   basketAdded: false,
@@ -1545,6 +1552,23 @@ const DEFAULT_REFERENCE_DATA = {
     guaranteed_next_day: ["dpd_next_day", "rm_special_next_day"],
     aimed_next_day: ["rm_1st_class", "rm_tracked_24"],
     two_to_three_days: ["evri_standard", "dpd_classic", "rm_2nd_class", "rm_tracked_48"]
+  },
+  multicarrierContentsCategories: [
+    { key:"general_goods", label:"General goods", description:"Books, clothing, toys, and other standard household goods." },
+    { key:"documents", label:"Documents", description:"Paper documents and low-value printed material." },
+    { key:"electronics_high_value", label:"Electronics", description:"Phones, tablets, laptops, and other electronic devices." },
+    { key:"valuables", label:"Valuables", description:"Money, jewellery, precious metals, or high-value personal items." },
+    { key:"fragile_glass", label:"Highly fragile items", description:"Glass, ceramics, and breakable items." },
+    { key:"perishables", label:"Perishables", description:"Food or temperature-sensitive perishables." },
+    { key:"artwork_collectibles", label:"Artwork / collectibles", description:"Artwork, antiques, or irreplaceable collectibles." },
+    { key:"irreplaceable_items", label:"Irreplaceable items", description:"Unique one-off items with no practical replacement value." }
+  ],
+  multicarrierCompensationExclusions: {
+    default: ["valuables", "fragile_glass", "perishables", "electronics_high_value", "artwork_collectibles", "irreplaceable_items"],
+    evri_standard: ["valuables", "fragile_glass", "perishables", "electronics_high_value", "artwork_collectibles", "irreplaceable_items"],
+    dpd_classic: ["valuables", "fragile_glass", "perishables", "electronics_high_value", "artwork_collectibles", "irreplaceable_items"],
+    dpd_next_day: ["valuables", "fragile_glass", "perishables", "artwork_collectibles", "irreplaceable_items"],
+    evri_international: ["valuables", "fragile_glass", "perishables", "electronics_high_value", "artwork_collectibles", "irreplaceable_items"]
   }
 };
 
@@ -1583,6 +1607,31 @@ function loadReferenceData(){
     });
     if(Object.keys(map).length){
       ref.domesticDeliveryPreferenceServiceMap = map;
+    }
+  }
+  if(Array.isArray(override.multicarrierContentsCategories)){
+    const categories = override.multicarrierContentsCategories
+      .filter(item => item && typeof item.key === "string" && typeof item.label === "string")
+      .map(item => ({
+        key: String(item.key),
+        label: String(item.label),
+        description: String(item.description || ""),
+        warningMessage: String(item.warningMessage || "")
+      }));
+    if(categories.length){
+      ref.multicarrierContentsCategories = categories;
+    }
+  }
+  if(override.multicarrierCompensationExclusions && typeof override.multicarrierCompensationExclusions === "object"){
+    const exclusions = {};
+    Object.keys(override.multicarrierCompensationExclusions).forEach(key => {
+      const values = override.multicarrierCompensationExclusions[key];
+      if(Array.isArray(values)){
+        exclusions[key] = values.map(value => String(value));
+      }
+    });
+    if(Object.keys(exclusions).length){
+      ref.multicarrierCompensationExclusions = exclusions;
     }
   }
   return ref;
@@ -1655,6 +1704,7 @@ function applyDestinationSelection(value){
   state.evriScreeningComplete = false;
   state.evriLossOnlySelected = false;
   state.evriNoCompSelected = false;
+  resetMulticarrierCompensationState();
   setDestinationPill();
 }
 
@@ -1685,6 +1735,7 @@ function setQuickDemoPreset(mode){
   if(!chosen || chosen.profile !== "evri_dpd"){
     state.senderPostcode = "";
     state.senderAddress = "";
+    resetMulticarrierCompensationState();
   }
 }
 
@@ -1931,6 +1982,111 @@ function deliveryPreferenceIndicativeFrom(code){
   return Number.isFinite(min) ? Number(min.toFixed(2)) : null;
 }
 
+function multicarrierContentsCategories(){
+  const list = REFERENCE_DATA.multicarrierContentsCategories;
+  if(!Array.isArray(list) || !list.length) return [];
+  return list
+    .filter(item => item && typeof item.key === "string" && typeof item.label === "string")
+    .map(item => ({
+      key: String(item.key),
+      label: String(item.label),
+      description: String(item.description || ""),
+      warningMessage: String(item.warningMessage || "")
+    }));
+}
+
+function selectedContentsCategory(){
+  return multicarrierContentsCategories().find(item => item.key === state.contentsCategoryKey) || null;
+}
+
+function multicarrierCompensationExclusionsForService(serviceId){
+  const rules = REFERENCE_DATA.multicarrierCompensationExclusions || {};
+  if(serviceId && Array.isArray(rules[serviceId])){
+    return new Set(rules[serviceId].map(value => String(value)));
+  }
+  if(Array.isArray(rules.default)){
+    return new Set(rules.default.map(value => String(value)));
+  }
+  return new Set();
+}
+
+function resetMulticarrierCompensationState(){
+  state.multicarrierCompOutcome = "";
+  state.multicarrierCompWarningShown = false;
+  state.multicarrierCompAcknowledged = false;
+  state.multicarrierCompReason = "";
+  state.multicarrierCompServiceId = "";
+  state.multicarrierCompCategoryKey = "";
+}
+
+function evaluateMulticarrierCompensation(service, categoryKey){
+  if(!service || service.profile !== "evri_dpd"){
+    return { applies: false, eligible: true, outcome: "not_applicable", warningShown: false, reason: "" };
+  }
+  const category = multicarrierContentsCategories().find(item => item.key === categoryKey) || null;
+  if(!category){
+    return { applies: true, eligible: true, outcome: "unknown_category", warningShown: false, reason: "" };
+  }
+  const excluded = multicarrierCompensationExclusionsForService(service.id);
+  const notCovered = excluded.has(categoryKey);
+  if(!notCovered){
+    return { applies: true, eligible: true, outcome: "covered", warningShown: false, reason: "" };
+  }
+  const reason = category.warningMessage
+    || `The selected contents category (${category.label}) is not covered for compensation on this multicarrier service.`;
+  return { applies: true, eligible: false, outcome: "not_covered", warningShown: true, reason };
+}
+
+function runMulticarrierCompensationCheck(options = {}){
+  const service = selectedService();
+  const category = selectedContentsCategory();
+  const categoryKey = category ? category.key : "";
+  const force = !!options.force;
+
+  if(!service || service.profile !== "evri_dpd"){
+    resetMulticarrierCompensationState();
+    return { applies: false, eligible: true, outcome: "not_applicable", warningShown: false, reason: "" };
+  }
+  if(!categoryKey){
+    resetMulticarrierCompensationState();
+    return { applies: true, eligible: true, outcome: "missing_category", warningShown: false, reason: "" };
+  }
+
+  const alreadyComputed = !force
+    && state.multicarrierCompServiceId === service.id
+    && state.multicarrierCompCategoryKey === categoryKey
+    && !!state.multicarrierCompOutcome;
+  if(alreadyComputed){
+    return {
+      applies: true,
+      eligible: state.multicarrierCompOutcome !== "not_covered",
+      outcome: state.multicarrierCompOutcome,
+      warningShown: !!state.multicarrierCompWarningShown,
+      reason: state.multicarrierCompReason || ""
+    };
+  }
+
+  const result = evaluateMulticarrierCompensation(service, categoryKey);
+  state.multicarrierCompOutcome = result.outcome;
+  state.multicarrierCompWarningShown = result.warningShown;
+  state.multicarrierCompAcknowledged = false;
+  state.multicarrierCompReason = result.reason || "";
+  state.multicarrierCompServiceId = service.id;
+  state.multicarrierCompCategoryKey = categoryKey;
+
+  logAudit("kiosk_795_compensation_check", {
+    serviceId: service.id,
+    serviceName: service.name,
+    contentsCategory: categoryKey,
+    contentsCategoryLabel: category ? category.label : "",
+    compensationEligibilityOutcome: result.outcome,
+    warningShown: result.warningShown,
+    customerAcknowledged: false
+  });
+
+  return result;
+}
+
 function logAudit(eventType, payload = {}){
   const entry = {
     at: new Date().toISOString(),
@@ -2006,7 +2162,15 @@ function applyQuickDemoDefaults(){
   }
 
   if(!state.declaredValue) state.declaredValue = "39.99";
-  if(!state.contentDescription) state.contentDescription = "Books and stationery";
+  const categoryDefaults = multicarrierContentsCategories();
+  if(!state.contentsCategoryKey){
+    const fallbackCategory = categoryDefaults.find(item => item.key === "general_goods") || categoryDefaults[0];
+    state.contentsCategoryKey = fallbackCategory ? fallbackCategory.key : "";
+  }
+  if(!state.contentDescription){
+    const selectedCategory = selectedContentsCategory();
+    state.contentDescription = selectedCategory ? selectedCategory.label : "General goods";
+  }
   if(isDomesticJourney()){
     const prefs = domesticDeliveryPreferences();
     const valid = prefs.some(opt => opt.key === state.deliverySpeed);
@@ -2070,6 +2234,7 @@ function applyQuickDemoDefaults(){
   } else if(selected && selected.profile !== "evri_dpd"){
     state.senderPostcode = "";
     state.senderAddress = "";
+    resetMulticarrierCompensationState();
   }
 
   if(!state.paymentMethod) state.paymentMethod = "card";
@@ -2370,6 +2535,8 @@ function updateBreadcrumb(){
   const rmDg = state.rmOtherSelected
     ? "Other / not listed"
     : (rmRule ? rmRule.label : "Not set");
+  const contentsCategory = selectedContentsCategory();
+  const contentsCategoryLabel = contentsCategory ? contentsCategory.label : "Not set";
   const value = numericValue(state.declaredValue) > 0
     ? `£${numericValue(state.declaredValue).toFixed(2)}`
     : "Not set";
@@ -2381,15 +2548,22 @@ function updateBreadcrumb(){
   const carrierStatus = service && service.profile === "evri_dpd"
     ? (state.evriScreeningComplete ? "Screened" : "Pending")
     : "N/A";
+  const compensationStatus = service && service.profile === "evri_dpd"
+    ? (state.multicarrierCompOutcome === "not_covered"
+      ? (state.multicarrierCompAcknowledged ? "Not covered (ack)" : "Not covered (pending)")
+      : (state.multicarrierCompOutcome === "covered" ? "Covered" : "Pending"))
+    : "N/A";
 
   const allCrumbs = [
     { icon:"scale", label:"Weight", value: state.weightG ? `${state.weightG} g` : "Not set" },
     { icon:"public", label:"Destination", value: dest },
     { icon:"dangerous", label:"RM DG", value: rmDg },
+    { icon:"category", label:"Contents", value: contentsCategoryLabel },
     { icon:"straighten", label:"Format", value: fmt },
     { icon:"payments", label:"Value", value },
     { icon:"bolt", label:"Speed", value: speed },
     { icon:"local_shipping", label:"Service", value: service ? service.name : "Not set" },
+    { icon:"gpp_maybe", label:"K795", value: compensationStatus },
     { icon:"location_on", label:"NI movement", value: niStatus },
     { icon:"fact_check", label:"EVRi/DPD", value: carrierStatus }
   ];
@@ -2458,7 +2632,11 @@ function render(){
     const needsEvri = !!(chosen && chosen.profile === "evri_dpd");
     const niRoute = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
     if(stage === "service"){
-      nextBtn.innerHTML = `Continue to recipient details <span class="material-symbols-outlined">arrow_forward</span>`;
+      nextBtn.innerHTML = needsEvri
+        ? `Continue to compensation check <span class="material-symbols-outlined">arrow_forward</span>`
+        : `Continue to recipient details <span class="material-symbols-outlined">arrow_forward</span>`;
+    } else if(stage === "mc_comp"){
+      nextBtn.innerHTML = `Acknowledge and continue <span class="material-symbols-outlined">arrow_forward</span>`;
     } else if(stage === "recipient"){
       nextBtn.innerHTML = needsEvri
         ? `Continue to sender details <span class="material-symbols-outlined">arrow_forward</span>`
@@ -3061,6 +3239,7 @@ function renderCaptureItemDetails(){
   const dest = state.destination === "uk" ? "UK Inland" : "International";
   const isDomestic = isDomesticJourney();
   const speedOptions = domesticDeliveryPreferences();
+  const contentsCategories = multicarrierContentsCategories();
   const speedSection = isDomestic ? `
         <h3 style="margin-top:14px;">Delivery speed preference (KIOSK-427)</h3>
         <div class="choiceRow3" id="captureSpeedChoices">
@@ -3106,6 +3285,20 @@ function renderCaptureItemDetails(){
       <h3 style="margin-top:14px;">Using the keypad, please enter the value of the item being posted (KIOSK-407)</h3>
       <input id="declaredValueInput" inputmode="decimal" placeholder="e.g. 49.99" value="${escapeHtml(state.declaredValue)}" />
 
+      <h3 style="margin-top:14px;">Declare contents category (KIOSK-408)</h3>
+      ${contentsCategories.length ? `
+        <div class="choiceGroup" id="contentsCategoryChoices">
+          ${contentsCategories.map(category => `
+            <button type="button" class="choiceBtn ${state.contentsCategoryKey===category.key?"active":""}" data-value="${escapeHtml(category.key)}">
+              <span>${escapeHtml(category.label)}</span>
+              <span class="sub">${escapeHtml(category.description || "Select category")}</span>
+            </button>
+          `).join("")}
+        </div>
+      ` : `
+        <div class="banner danger show" style="display:block;">Contents categories are missing from reference data.</div>
+      `}
+
       ${speedSection}
     </div>
   `;
@@ -3125,6 +3318,15 @@ function renderCaptureItemDetails(){
     }
     state.declaredValue = raw.slice(0, 10);
     e.target.value = state.declaredValue;
+  });
+  document.querySelectorAll("#contentsCategoryChoices .choiceBtn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.contentsCategoryKey = btn.dataset.value || "";
+      const category = selectedContentsCategory();
+      state.contentDescription = category ? category.label : "";
+      resetMulticarrierCompensationState();
+      document.querySelectorAll("#contentsCategoryChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
+    });
   });
   const speedChoices = document.querySelectorAll("#captureSpeedChoices .choiceBtn");
   speedChoices.forEach(btn=>{
@@ -3380,10 +3582,12 @@ function renderFilterAndPresentOptions(){
   const showRMNISpecial = showGBToNI && selectedRMRule && !!selectedRMRule.niRule;
   const chosenService = selectedService();
   const needsEvriAdditional = !!(chosenService && chosenService.profile === "evri_dpd");
+  const contentsCategory = selectedContentsCategory();
   const setSelectedService = (serviceId)=>{
     state.selectedServiceId = serviceId || "";
     const chosen = selectedService();
     state.productProfile = chosen ? chosen.profile : "royal_mail";
+    resetMulticarrierCompensationState();
     if(state.productProfile !== "evri_dpd"){
       state.evriScreeningOpen = false;
       state.evriAdditionalSelection = "";
@@ -3415,11 +3619,19 @@ function renderFilterAndPresentOptions(){
   const narrativeRM = selectedRMRule
     ? `RM DG selection: ${selectedRMRule.label}${state.rmConditionSatisfied ? " (conditions complete)." : " (conditions pending)."}` 
     : "RM DG selection: not set.";
+  const narrativeContents = contentsCategory
+    ? `Contents category (KIOSK-408): ${contentsCategory.label}.`
+    : "Contents category (KIOSK-408): not selected.";
   const narrativeCarrier = !chosenService
     ? "Select a postage product to determine carrier screening requirements."
     : needsEvriAdditional
     ? `EVRi/DPD screening: ${state.evriScreeningComplete ? "complete" : "pending"}${state.evriAdditionalSelection === "blocked" ? ` (blocked by ${evriProhibitedLabel})` : ""}.`
     : "Carrier-specific EVRi/DPD screening not required for current service.";
+  const narrativeComp = !chosenService
+    ? "KIOSK-795 compensation check will run after multicarrier service selection."
+    : needsEvriAdditional
+    ? "KIOSK-795 compensation eligibility check required before address capture."
+    : "KIOSK-795 compensation check not required for Royal Mail.";
   const narrativeNI = showNI
     ? `NI movement information: ${niMovementValidation().length ? "pending" : "complete"}${state.niCustomsReference ? ` (${state.niCustomsReference})` : ""}.`
     : "NI movement information not required for current postcode.";
@@ -3429,6 +3641,11 @@ function renderFilterAndPresentOptions(){
 
   const stage = state.filterFlowStage || "service";
   if(stage === "sender" && !needsEvriAdditional){
+    state.filterFlowStage = "recipient";
+    renderFilterAndPresentOptions();
+    return;
+  }
+  if(stage === "mc_comp" && !needsEvriAdditional){
     state.filterFlowStage = "recipient";
     renderFilterAndPresentOptions();
     return;
@@ -3478,6 +3695,8 @@ function renderFilterAndPresentOptions(){
           <div class="flowNarrative">
             <h4>Journey Note</h4>
             <p>Select a postage product, then continue.</p>
+            <p>${escapeHtml(narrativeContents)}</p>
+            <p>${escapeHtml(narrativeComp)}</p>
             <p>${escapeHtml(narrativeSpeed)}</p>
             <p>${escapeHtml(narrativeRM)}</p>
             <p>${escapeHtml(narrativeCarrier)}</p>
@@ -3495,6 +3714,133 @@ function renderFilterAndPresentOptions(){
     return;
   }
 
+  if(stage === "mc_comp"){
+    if(!chosenService || chosenService.profile !== "evri_dpd"){
+      state.filterFlowStage = "recipient";
+      renderFilterAndPresentOptions();
+      return;
+    }
+    if(!contentsCategory){
+      screen.innerHTML = `
+        <div class="stepHeader">
+          <div>
+            <h1>Compensation check (KIOSK-795)</h1>
+            <p class="subtitle">Contents category is required before multicarrier compensation checks can run.</p>
+          </div>
+          <span class="pill"><span class="material-symbols-outlined">gpp_maybe</span> KIOSK-795</span>
+        </div>
+        <div class="card">
+          <div class="banner danger show" style="display:block;">
+            Select a contents category in KIOSK-408 before choosing an EVRi/DPD service.
+          </div>
+          <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+            <button type="button" class="btn" id="backToItemDetailsBtn">
+              <span class="material-symbols-outlined">arrow_back</span>Back to item details
+            </button>
+            <button type="button" class="btn ghost" id="backToServiceFromMissingCategoryBtn">
+              <span class="material-symbols-outlined">arrow_back</span>Back to service list
+            </button>
+          </div>
+        </div>
+      `;
+      const backToItemDetailsBtn = document.getElementById("backToItemDetailsBtn");
+      if(backToItemDetailsBtn){
+        backToItemDetailsBtn.addEventListener("click", ()=>{
+          navigateToStep(3);
+        });
+      }
+      const backToServiceFromMissingCategoryBtn = document.getElementById("backToServiceFromMissingCategoryBtn");
+      if(backToServiceFromMissingCategoryBtn){
+        backToServiceFromMissingCategoryBtn.addEventListener("click", ()=>{
+          state.filterFlowStage = "service";
+          render();
+        });
+      }
+      return;
+    }
+
+    const check = runMulticarrierCompensationCheck();
+    if(check.eligible){
+      state.filterFlowStage = "recipient";
+      renderFilterAndPresentOptions();
+      return;
+    }
+
+    const warningText = check.reason || "This item is not covered by compensation on the selected multicarrier service.";
+    screen.innerHTML = `
+      <div class="stepHeader">
+        <div>
+          <h1>Compensation exclusion warning (KIOSK-795)</h1>
+          <p class="subtitle">Multicarrier only: review and acknowledge before continuing.</p>
+        </div>
+        <span class="pill"><span class="material-symbols-outlined">warning</span> KIOSK-795</span>
+      </div>
+
+      <div class="flowShell">
+        <div class="flowMain">
+          <div class="card">
+            <h3>Selected multicarrier service</h3>
+            <div class="helpNote">
+              <strong>Service:</strong> ${escapeHtml(chosenService.name)}<br/>
+              <strong>Contents category:</strong> ${escapeHtml(contentsCategory.label)}
+            </div>
+          </div>
+          <div class="card">
+            <div class="banner danger show" style="display:block;">
+              <strong>Item not covered by compensation.</strong><br/>
+              ${escapeHtml(warningText)}<br/><br/>
+              If this parcel is lost or damaged on this service, compensation will not be payable.
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+              <button type="button" class="btn primary" id="mcCompAcknowledgeBtn">
+                I understand - continue anyway <span class="material-symbols-outlined">arrow_forward</span>
+              </button>
+              <button type="button" class="btn" id="mcCompChangeServiceBtn">
+                <span class="material-symbols-outlined">swap_horiz</span>Choose different service
+              </button>
+            </div>
+          </div>
+        </div>
+        <aside class="flowAside">
+          <div class="flowNarrative">
+            <h4>Journey Note</h4>
+            <p>KIOSK-795 applies only to multicarrier products.</p>
+            <p>Customer must acknowledge the no-compensation warning before journey continues.</p>
+            <p>Customer can return to service selection to choose an alternative service.</p>
+          </div>
+        </aside>
+      </div>
+    `;
+
+    const mcCompAcknowledgeBtn = document.getElementById("mcCompAcknowledgeBtn");
+    if(mcCompAcknowledgeBtn){
+      mcCompAcknowledgeBtn.addEventListener("click", ()=>{
+        state.multicarrierCompAcknowledged = true;
+        logAudit("kiosk_795_compensation_acknowledged", {
+          serviceId: chosenService.id,
+          serviceName: chosenService.name,
+          contentsCategory: contentsCategory.key,
+          contentsCategoryLabel: contentsCategory.label,
+          compensationEligibilityOutcome: state.multicarrierCompOutcome || "not_covered",
+          warningShown: true,
+          customerAcknowledged: true
+        });
+        state.filterFlowStage = "recipient";
+        render();
+      });
+    }
+
+    const mcCompChangeServiceBtn = document.getElementById("mcCompChangeServiceBtn");
+    if(mcCompChangeServiceBtn){
+      mcCompChangeServiceBtn.addEventListener("click", ()=>{
+        state.multicarrierCompAcknowledged = false;
+        state.filterFlowStage = "service";
+        render();
+      });
+    }
+    return;
+  }
+
   if(stage === "recipient"){
     const nextRecipientRoute = !chosenService
       ? "Select a product first."
@@ -3503,6 +3849,13 @@ function renderFilterAndPresentOptions(){
       : showNI
       ? "Next screen: NI movement information."
       : "Next screen: basket review.";
+    const compensationNarrative = needsEvriAdditional
+      ? (state.multicarrierCompOutcome === "not_covered"
+        ? `KIOSK-795: not covered${state.multicarrierCompAcknowledged ? " (acknowledged)." : " (pending acknowledgement)." }`
+        : (state.multicarrierCompOutcome === "covered"
+          ? "KIOSK-795: covered."
+          : "KIOSK-795: pending check."))
+      : "KIOSK-795: not applicable (Royal Mail).";
 
     screen.innerHTML = `
       <div class="stepHeader">
@@ -3542,6 +3895,7 @@ function renderFilterAndPresentOptions(){
             <h4>Journey Note</h4>
             <p>Enter recipient postcode and first address line only on this screen.</p>
             <p>${escapeHtml(nextRecipientRoute)}</p>
+            <p>${escapeHtml(compensationNarrative)}</p>
             <p>${escapeHtml(narrativeSpeed)}</p>
             <p>${escapeHtml(narrativeRM)}</p>
           </div>
@@ -3899,6 +4253,8 @@ function renderBasketAndPay(){
   const recipientSnippet = [state.recipientPostcode, state.recipientAddress].filter(Boolean).join(" - ");
   const senderSnippet = [state.senderPostcode, state.senderAddress].filter(Boolean).join(" - ");
   const showSenderSnippet = !!(service && service.profile === "evri_dpd");
+  const contentsCategory = selectedContentsCategory();
+  const contentsCategorySnippet = contentsCategory ? contentsCategory.label : "Not set";
   const rmRule = currentRMRule();
   const rmDgSnippet = state.rmOtherSelected
     ? "RM DG: Other / not listed"
@@ -3910,8 +4266,15 @@ function renderBasketAndPay(){
     .map(key => LOSS_ONLY.find(item => item.key === key)?.label)
     .filter(Boolean);
   const podSnippet = state.proofOfDelivery ? "Proof of delivery: Yes (+£1.50)" : "Proof of delivery: No";
+  const compensationSnippet = service && service.profile === "evri_dpd"
+    ? (state.multicarrierCompOutcome === "not_covered"
+      ? `KIOSK-795: Not covered${state.multicarrierCompAcknowledged ? " (acknowledged)" : " (pending acknowledgement)"}`
+      : (state.multicarrierCompOutcome === "covered"
+        ? "KIOSK-795: Covered"
+        : "KIOSK-795: Pending"))
+    : "KIOSK-795: Not applicable";
   const carrierContentSnippet = service && service.profile === "evri_dpd"
-    ? `EVRi/DPD screening: ${state.evriScreeningComplete ? "Complete" : "Pending"} • No-comp: ${state.evriNoCompSelected ? "Yes" : "No"} • Loss-only: ${state.evriLossOnlySelected ? "Yes" : "No"}`
+    ? `EVRi/DPD screening: ${state.evriScreeningComplete ? "Complete" : "Pending"} • ${compensationSnippet} • No-comp: ${state.evriNoCompSelected ? "Yes" : "No"} • Loss-only: ${state.evriLossOnlySelected ? "Yes" : "No"}`
     : rmDgSnippet;
   const itemHeading = service
     ? `${service.name} • ${state.recipientPostcode || "Postcode not set"} • ${profileLabel}`
@@ -3943,6 +4306,7 @@ function renderBasketAndPay(){
               <div class="basketItemMain">${escapeHtml(itemHeading)}</div>
               <div class="basketItemSub">To: ${escapeHtml(clip(recipientSnippet, 72))}</div>
               ${showSenderSnippet ? `<div class="basketItemSub">From: ${escapeHtml(clip(senderSnippet, 72))}</div>` : ""}
+              <div class="basketItemSub">Contents: ${escapeHtml(clip(contentsCategorySnippet, 72))}</div>
               <div class="basketItemSub">${escapeHtml(podSnippet)} • ${escapeHtml(carrierContentSnippet)}</div>
             </div>
             <div class="basketItemPrice">£${basePrice.toFixed(2)}</div>
@@ -3953,6 +4317,11 @@ function renderBasketAndPay(){
           ${service.profile === "evri_dpd" && state.evriNoCompSelected ? `
             <div class="banner warn show" style="display:block; margin:12px 14px;">
               No-compensation category selected${evriNoCompLabels.length ? `: ${escapeHtml(evriNoCompLabels.join(", "))}` : ""}. Item travels at sender risk.
+            </div>
+          ` : ""}
+          ${service.profile === "evri_dpd" && state.multicarrierCompOutcome === "not_covered" ? `
+            <div class="banner danger show" style="display:block; margin:12px 14px;">
+              KIOSK-795: This contents category is not covered by compensation on the selected multicarrier service.
             </div>
           ` : ""}
           ${service.profile === "evri_dpd" && state.evriLossOnlySelected ? `
@@ -4009,6 +4378,7 @@ function renderBasketAndPay(){
       state.evriNoCompSelected = false;
       state.coverLossOnlyKeys = new Set();
       state.coverNoCompKeys = new Set();
+      resetMulticarrierCompensationState();
       state.paymentComplete = false;
       state.transactionRef = "";
       state.filterFlowStage = "service";
@@ -4037,6 +4407,13 @@ function renderBasketAndPay(){
       if(!hasSender){
         alert("Complete sender postcode and first address line before finishing.");
         state.filterFlowStage = "sender";
+        navigateToStep(4);
+        return;
+      }
+      const compensation = runMulticarrierCompensationCheck();
+      if(compensation.warningShown && !state.multicarrierCompAcknowledged){
+        alert("Acknowledge the KIOSK-795 compensation warning before finishing.");
+        state.filterFlowStage = "mc_comp";
         navigateToStep(4);
         return;
       }
@@ -4076,6 +4453,12 @@ function renderPrintAndConfirm(){
   const service = selectedService();
   const total = basketTotal();
   const dest = state.destination === "uk" ? "UK Inland" : "International";
+  const contentsCategory = selectedContentsCategory();
+  const compensationLine = service && service.profile === "evri_dpd"
+    ? (state.multicarrierCompOutcome === "not_covered"
+      ? `Not covered${state.multicarrierCompAcknowledged ? " (acknowledged)" : " (not acknowledged)"}`
+      : (state.multicarrierCompOutcome === "covered" ? "Covered" : "Pending"))
+    : "Not applicable";
 
   screen.innerHTML = `
     <div class="stepHeader">
@@ -4102,6 +4485,8 @@ function renderPrintAndConfirm(){
           <strong>Reference:</strong> ${escapeHtml(state.transactionRef || "Pending")}<br/>
           <strong>Service:</strong> ${escapeHtml(service ? service.name : "Not selected")}<br/>
           <strong>Destination:</strong> ${dest}<br/>
+          <strong>Contents category:</strong> ${escapeHtml(contentsCategory ? contentsCategory.label : "Not set")}<br/>
+          <strong>KIOSK-795 compensation:</strong> ${escapeHtml(compensationLine)}<br/>
           <strong>Total paid:</strong> £${total.toFixed(2)}<br/>
           <strong>Recipient postcode:</strong> ${escapeHtml(state.recipientPostcode || "—")}
         </div>
@@ -4123,6 +4508,12 @@ function renderSummary(){
   const fmt = ({letter:"Letter", large_letter:"Large letter", parcel:"Parcel"})[state.format] || "Not set";
   const service = selectedService();
   const profile = service ? (service.profile === "royal_mail" ? "Royal Mail rules" : "EVRi/DPD rules") : "Not selected";
+  const contentsCategory = selectedContentsCategory();
+  const k795Summary = service && service.profile === "evri_dpd"
+    ? (state.multicarrierCompOutcome === "not_covered"
+      ? `Not covered${state.multicarrierCompAcknowledged ? " (acknowledged)" : " (pending acknowledgement)"}`
+      : (state.multicarrierCompOutcome === "covered" ? "Covered" : "Pending"))
+    : "Not applicable";
 
   const restrictedLabels = [...state.restrictedKeys].map(k => RESTRICTED.find(x=>x.key===k)?.label).filter(Boolean);
   const lossLabels = [...state.coverLossOnlyKeys].map(k => LOSS_ONLY.find(x=>x.key===k)?.label).filter(Boolean);
@@ -4149,6 +4540,7 @@ function renderSummary(){
           <span class="tag"><span class="material-symbols-outlined">straighten</span> ${fmt}</span>
           <span class="tag"><span class="material-symbols-outlined">public</span> ${dest}</span>
           <span class="tag"><span class="material-symbols-outlined">inventory</span> ${profile}</span>
+          <span class="tag"><span class="material-symbols-outlined">category</span> ${escapeHtml(contentsCategory ? contentsCategory.label : "Contents not set")}</span>
         </div>
         <div class="helpNote">Next in the real journey: product/service filtering & pricing.</div>
       </div>
@@ -4184,6 +4576,7 @@ function renderSummary(){
             <strong>RM GB to NI status:</strong> ${rmNi.ok ? "Clear" : escapeHtml(rmNi.message || "Blocked or incomplete")}<br/>
             <strong>Delivery preference:</strong> ${escapeHtml(speedDisplay)}<br/>
             <strong>Delivery preference audit:</strong> ${lastSpeedAudit ? `${escapeHtml(lastSpeedAudit.at)} (${escapeHtml(lastSpeedAudit.deliverySpeedLabel || lastSpeedAudit.deliverySpeed || "Unknown")})` : "No speed event logged"}<br/>
+            <strong>KIOSK-795 compensation:</strong> ${escapeHtml(k795Summary)}<br/>
             <strong>EVRi/DPD loss-only flag:</strong> ${state.evriLossOnlySelected ? "Yes" : "No"}<br/>
             <strong>EVRi/DPD no-comp flag:</strong> ${state.evriNoCompSelected ? "Yes" : "No"}<br/>
             <strong>Legacy restricted flags:</strong> ${restrictedLabels.length ? escapeHtml(restrictedLabels.join(", ")) : "None"} / ${lossLabels.length ? escapeHtml(lossLabels.join(", ")) : "None"} / ${ncLabels.length ? escapeHtml(ncLabels.join(", ")) : "None"}
@@ -4319,7 +4712,9 @@ function canContinue(){
 
   if(state.step === 3){
     const speedOk = !isDomesticJourney() || isValidDomesticDeliveryPreference(state.deliverySpeed);
-    return !!state.format && numericValue(state.declaredValue) > 0 && speedOk;
+    const categories = multicarrierContentsCategories();
+    const categoryOk = !categories.length || !!state.contentsCategoryKey;
+    return !!state.format && numericValue(state.declaredValue) > 0 && speedOk && categoryOk;
   }
 
   if(state.step === 4){
@@ -4328,6 +4723,9 @@ function canContinue(){
     const needsEvri = !!(service && service.profile === "evri_dpd");
     if(stage === "service"){
       return !!state.selectedServiceId;
+    }
+    if(stage === "mc_comp"){
+      return !!state.multicarrierCompAcknowledged;
     }
     if(stage === "recipient"){
       return !!state.selectedServiceId && !!state.recipientPostcode && !!state.recipientAddress;
@@ -4374,14 +4772,18 @@ function next(){
     }
     if(state.step === 3){
       alert(isDomesticJourney()
-        ? "Confirm format, enter item value, and choose delivery speed preference before continuing."
-        : "Confirm format and enter item value before continuing.");
+        ? "Confirm format, enter item value, select contents category, and choose delivery speed preference before continuing."
+        : "Confirm format, enter item value, and select contents category before continuing.");
       return;
     }
     if(state.step === 4){
       const stage = state.filterFlowStage || "service";
       if(stage === "service"){
         alert("Select a postage product before continuing.");
+        return;
+      }
+      if(stage === "mc_comp"){
+        alert("Acknowledge the compensation warning or choose a different service.");
         return;
       }
       if(stage === "recipient"){
@@ -4427,6 +4829,24 @@ function next(){
     const recipientIsBT = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
 
     if(stage === "service"){
+      if(needsEvri){
+        if(!state.contentsCategoryKey){
+          alert("Select contents category (KIOSK-408) before multicarrier compensation checks.");
+          navigateToStep(3);
+          return;
+        }
+        const compensation = runMulticarrierCompensationCheck();
+        if(compensation.warningShown && !state.multicarrierCompAcknowledged){
+          state.filterFlowStage = "mc_comp";
+          render();
+          return;
+        }
+      }
+      state.filterFlowStage = "recipient";
+      render();
+      return;
+    }
+    if(stage === "mc_comp"){
       state.filterFlowStage = "recipient";
       render();
       return;
@@ -4490,6 +4910,11 @@ function back(){
       return;
     }
     const stage = state.filterFlowStage || "service";
+    if(stage === "mc_comp"){
+      state.filterFlowStage = "service";
+      render();
+      return;
+    }
     if(stage === "ni"){
       const service = selectedService();
       const needsEvri = !!(service && service.profile === "evri_dpd");
@@ -4540,6 +4965,7 @@ function resetAll(){
   state.manualWeightEditOpen = false;
   state.declaredValue = "";
   state.contentDescription = "";
+  state.contentsCategoryKey = "";
   state.deliverySpeed = "";
   state.recipientPostcode = "";
   state.recipientAddress = "";
@@ -4558,6 +4984,12 @@ function resetAll(){
   state.rmNiPerishableRoute = "";
   state.rmNiPlantCertRef = "";
   state.proofOfDelivery = false;
+  state.multicarrierCompOutcome = "";
+  state.multicarrierCompWarningShown = false;
+  state.multicarrierCompAcknowledged = false;
+  state.multicarrierCompReason = "";
+  state.multicarrierCompServiceId = "";
+  state.multicarrierCompCategoryKey = "";
   state.selectedServiceId = "";
   state.filterFlowStage = "service";
   state.basketAdded = false;
