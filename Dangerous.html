@@ -74,10 +74,22 @@
     h1{margin:4px 0 4px;font-size:34px;letter-spacing:.2px;color:#2a2550;}
     .subtitle{color:var(--muted);margin:0 0 16px;font-size:16px;}
     .stepHeader{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px;}
+    .stepPills{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      justify-content:flex-end;
+      flex-wrap:wrap;
+    }
     .pill{
       display:inline-flex;gap:8px;align-items:center;
       padding:8px 12px;border-radius:999px;border:1px solid var(--border);
       background:var(--panel);color:#2b2a44;font-weight:800;font-size:13px;
+    }
+    .wireframeHeaderPill{
+      border-color:#f1d6a8;
+      background:#fff5df;
+      color:#7b4f00;
     }
     .gridWrap{
       background:var(--panel);
@@ -1332,6 +1344,31 @@ function updateProgress(){
   backBtn.disabled = (state.step === 1);
 }
 
+function ensureHeaderWireframePill(){
+  const header = screen.querySelector(".stepHeader");
+  if(!header) return;
+
+  let pills = header.querySelector(".stepPills");
+  if(!pills){
+    const primaryPill = header.querySelector(":scope > .pill");
+    pills = document.createElement("div");
+    pills.className = "stepPills";
+    if(primaryPill){
+      primaryPill.replaceWith(pills);
+      pills.appendChild(primaryPill);
+    } else {
+      header.appendChild(pills);
+    }
+  }
+
+  if(!pills.querySelector(".wireframeHeaderPill")){
+    const wireframePill = document.createElement("span");
+    wireframePill.className = "pill wireframeHeaderPill";
+    wireframePill.innerHTML = `<span class="material-symbols-outlined">warning</span>Journey wireframe only`;
+    pills.appendChild(wireframePill);
+  }
+}
+
 function render(){
   applyQuickDemoDefaults();
   setDestinationPill();
@@ -1343,6 +1380,7 @@ function render(){
   else if(state.step === 4) renderFilterAndPresentOptions();
   else if(state.step === 5) renderBasketAndPay();
   else renderPrintAndConfirm();
+  ensureHeaderWireframePill();
 
   // Hide primary footer action on in-screen tap flows.
   if(state.step === 2 || (state.step === 4 && state.evriScreeningOpen)){
