@@ -595,6 +595,25 @@
       font-weight:900;
       line-height:1;
     }
+    .weightEditBtn{
+      margin-top:10px;
+      min-height:50px;
+      font-size:18px;
+      font-weight:800;
+      justify-content:center;
+    }
+    .weightInline{
+      display:none;
+      margin-top:10px;
+      text-align:left;
+    }
+    .weightInline.show{display:block;}
+    .weightInline p{
+      margin:0 0 8px;
+      color:var(--muted);
+      font-size:15px;
+      font-weight:700;
+    }
     .weightItemVisual{
       border:1px dashed #b8cbe3;
       border-radius:16px;
@@ -708,6 +727,7 @@
       .weightConfirmCard{grid-template-columns:1fr;padding:14px;}
       .weightCopy .label{font-size:17px;}
       .weightCopy .value{font-size:42px;}
+      .weightEditBtn{font-size:16px;min-height:46px;}
       .weightItemVisual{min-height:120px;font-size:56px;}
       .weightActions{grid-template-columns:1fr;}
       .weightActions .btn{font-size:18px;min-height:58px;}
@@ -797,6 +817,7 @@ const state = {
   restrictedKeys: new Set(),
   coverLossOnlyKeys: new Set(),
   coverNoCompKeys: new Set(),
+  manualWeightEditOpen: false,
   declaredValue: "",
   contentDescription: "",
   deliverySpeed: "",
@@ -1694,6 +1715,7 @@ function applyQuickDemoDefaults(){
   if(!state.quickDemoMode) return;
 
   if(!state.weightG) state.weightG = "850";
+  if(state.weightG) state.manualWeightEditOpen = false;
   if(!state.destination) state.destination = "uk";
   if(!state.format) state.format = "parcel";
   if(!state.rmSelectedKey){
@@ -2138,6 +2160,7 @@ function renderWeigh(){
     applyDestinationSelection("uk");
   }
   setDestinationPill();
+  const showManualWeightEditor = state.manualWeightEditOpen || !state.weightG;
 
   screen.innerHTML = `
     <div class="stepHeader">
@@ -2162,29 +2185,26 @@ function renderWeigh(){
             <div class="weightCopy">
               <p class="label">Your item weighs</p>
               <p class="value" id="weightReadout">${state.weightG ? `${escapeHtml(state.weightG)}g` : "--g"}</p>
+              <button type="button" class="btn secondary weightEditBtn" id="weightEditBtn">
+                <span class="material-symbols-outlined">edit</span>${showManualWeightEditor ? "Hide manual entry" : "Edit weight"}
+              </button>
+              <div class="weightInline ${showManualWeightEditor ? "show" : ""}" id="weightInlinePanel">
+                <p>Enter weight manually (grams) if not auto-populated.</p>
+                <input id="weightInlineInput" inputmode="numeric" placeholder="e.g. 850" value="${escapeHtml(state.weightG)}" />
+              </div>
             </div>
             <div class="weightItemVisual">
               <span class="material-symbols-outlined">inventory_2</span>
             </div>
           </div>
 
-          <div class="weighAssist">
-            <h3>Journey setup</h3>
-            <p>Destination and demo mode are set on the launch screen.</p>
-            <span class="tag"><span class="material-symbols-outlined">public</span>Destination: ${state.destination === "uk" ? "UK (Inc NI)" : "International"}</span>
-            <span class="tag"><span class="material-symbols-outlined">bolt</span>Demo fast-track: ${state.quickDemoMode ? "On" : "Off"}</span>
-
-            <p style="margin-top:12px;">Demo only: enter sample scale value (grams)</p>
-            <input id="weightInput" inputmode="numeric" placeholder="e.g. 350" value="${escapeHtml(state.weightG)}" />
-
-            <div class="weightActions">
-              <button type="button" class="btn secondary" id="weightRetryBtn">
-                <span class="material-symbols-outlined">replay</span>Try again
-              </button>
-              <button type="button" class="btn primary" id="weightConfirmBtn">
-                <span class="material-symbols-outlined">check_circle</span>Weight is correct
-              </button>
-            </div>
+          <div class="weightActions">
+            <button type="button" class="btn secondary" id="weightRetryBtn">
+              <span class="material-symbols-outlined">replay</span>Try again
+            </button>
+            <button type="button" class="btn primary" id="weightConfirmBtn">
+              <span class="material-symbols-outlined">check_circle</span>Weight is correct
+            </button>
           </div>
         </div>
       </div>
@@ -2197,9 +2217,12 @@ function renderWeigh(){
       </aside>
     </div>
   `;
-  document.getElementById("weightInput").addEventListener("input", (e)=> {
-    state.weightG = e.target.value.replace(/[^\d]/g,"").slice(0,6);
-    e.target.value = state.weightG;
+  const applyWeightInput = (rawValue) => {
+    state.weightG = String(rawValue || "").replace(/[^\d]/g,"").slice(0,6);
+    const inlineInput = document.getElementById("weightInlineInput");
+    if(inlineInput && inlineInput.value !== state.weightG){
+      inlineInput.value = state.weightG;
+    }
     const readout = document.getElementById("weightReadout");
     if(readout){
       readout.textContent = state.weightG ? `${state.weightG}g` : "--g";
@@ -2211,24 +2234,31 @@ function renderWeigh(){
     state.evriScreeningComplete = false;
     state.evriLossOnlySelected = false;
     state.evriNoCompSelected = false;
+  };
+
+  const weightInlineInput = document.getElementById("weightInlineInput");
+  if(weightInlineInput){
+    weightInlineInput.addEventListener("input", (e)=> {
+      applyWeightInput(e.target.value);
+    });
+  }
+
+  document.getElementById("weightEditBtn").addEventListener("click", ()=>{
+    state.manualWeightEditOpen = !showManualWeightEditor;
+    render();
   });
+
   document.getElementById("weightRetryBtn").addEventListener("click", ()=>{
-    state.weightG = "";
-    const input = document.getElementById("weightInput");
-    const readout = document.getElementById("weightReadout");
-    if(input){
-      input.value = "";
-      input.focus();
-    }
-    if(readout){
-      readout.textContent = "--g";
-    }
+    state.manualWeightEditOpen = true;
+    applyWeightInput("");
+    render();
   });
   document.getElementById("weightConfirmBtn").addEventListener("click", ()=>{
     if(!state.weightG){
       alert("Capture weight before continuing.");
       return;
     }
+    state.manualWeightEditOpen = false;
     if(!state.destination){
       alert("Select a destination before continuing.");
       return;
@@ -3739,6 +3769,7 @@ function resetAll(){
   state.restrictedKeys = new Set();
   state.coverLossOnlyKeys = new Set();
   state.coverNoCompKeys = new Set();
+  state.manualWeightEditOpen = false;
   state.declaredValue = "";
   state.contentDescription = "";
   state.deliverySpeed = "";
