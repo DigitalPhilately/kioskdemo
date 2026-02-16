@@ -44,6 +44,7 @@
       border-radius:22px;
       box-shadow:var(--shadow);
       overflow:hidden;
+      position:relative;
     }
     .topbar{
       display:flex;align-items:center;justify-content:space-between;
@@ -208,6 +209,72 @@
     .screenRefreshCard .material-symbols-outlined{
       font-size:24px;
       color:var(--accent);
+    }
+    .vkWrap{
+      display:none;
+      position:absolute;
+      left:0;
+      right:0;
+      bottom:88px;
+      z-index:80;
+      background:#edf3fb;
+      border-top:1px solid var(--border);
+      padding:12px 16px 14px;
+    }
+    .vkWrap.show{display:block;}
+    .vkHead{
+      color:#1f3653;
+      font-size:20px;
+      font-weight:900;
+      margin:0 0 8px;
+    }
+    .vkMirror{
+      width:100%;
+      min-height:58px;
+      border:2px solid #d8c37a;
+      border-radius:10px;
+      background:#fff;
+      padding:12px 14px;
+      color:#233651;
+      font-size:26px;
+      font-weight:800;
+      display:flex;
+      align-items:center;
+      margin-bottom:10px;
+    }
+    .vkRows{display:grid;gap:8px;}
+    .vkRow{
+      display:grid;
+      gap:8px;
+      grid-template-columns:repeat(var(--vk-cols, 10), minmax(0,1fr));
+    }
+    .vkKey{
+      border:1px solid var(--border);
+      border-radius:12px;
+      min-height:54px;
+      background:#fff;
+      color:#1f3653;
+      font-size:28px;
+      font-weight:800;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      user-select:none;
+    }
+    .vkKey:active{transform:translateY(1px);}
+    .vkKey.action{
+      font-size:22px;
+      background:#f7f9fd;
+    }
+    .vkFooter{
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+      margin-top:10px;
+    }
+    .chrome.keyboard-open .content{
+      padding-bottom:360px;
     }
     .gridWrap{
       background:var(--panel);
@@ -375,6 +442,10 @@
       width:100%;padding:14px 16px;border:1px solid var(--border);
       border-radius:14px;font-size:20px;outline:none;
       min-height:58px;
+    }
+    .kioskKeyboardInput{
+      cursor:pointer;
+      background:#fff;
     }
     input:focus,select:focus{border-color:#8eb9de;box-shadow:0 0 0 4px rgba(46,122,184,.12)}
     .helpNote{
@@ -575,6 +646,12 @@
       .launchTile{min-height:130px;font-size:24px;padding:16px;}
       .launchTile .material-symbols-outlined{font-size:44px;}
       .launchTile .sub{font-size:14px;}
+      .vkWrap{bottom:74px;padding:10px;}
+      .vkHead{font-size:16px;}
+      .vkMirror{font-size:20px;min-height:50px;}
+      .vkKey{min-height:46px;font-size:20px;}
+      .vkKey.action{font-size:16px;}
+      .chrome.keyboard-open .content{padding-bottom:330px;}
       .weightConfirmCard{grid-template-columns:1fr;padding:14px;}
       .weightCopy .label{font-size:17px;}
       .weightCopy .value{font-size:42px;}
@@ -618,6 +695,16 @@
     <div class="crumbBar" id="crumbBar"></div>
 
     <div class="content" id="screen"></div>
+
+    <div class="vkWrap" id="vkWrap" aria-hidden="true">
+      <p class="vkHead" id="vkHead">Enter details</p>
+      <div class="vkMirror" id="vkMirror"></div>
+      <div class="vkRows" id="vkRows"></div>
+      <div class="vkFooter">
+        <button type="button" class="btn secondary" id="vkCancelBtn">Cancel</button>
+        <button type="button" class="btn primary" id="vkDoneBtn">Next</button>
+      </div>
+    </div>
 
     <div class="bottombar">
       <button class="btn danger" id="cancelBtn"><span class="material-symbols-outlined">close</span>Cancel</button>
@@ -1598,6 +1685,13 @@ function applyQuickDemoDefaults(){
 const screen = document.getElementById("screen");
 const progress = document.getElementById("progress");
 const crumbBar = document.getElementById("crumbBar");
+const chromeEl = document.querySelector(".chrome");
+const vkWrap = document.getElementById("vkWrap");
+const vkHead = document.getElementById("vkHead");
+const vkMirror = document.getElementById("vkMirror");
+const vkRows = document.getElementById("vkRows");
+const vkCancelBtn = document.getElementById("vkCancelBtn");
+const vkDoneBtn = document.getElementById("vkDoneBtn");
 const nextBtn = document.getElementById("nextBtn");
 const backBtn = document.getElementById("backBtn");
 const resetBtn = document.getElementById("resetBtn");
@@ -1605,6 +1699,128 @@ const cancelBtn = document.getElementById("cancelBtn");
 const helpBtn = document.getElementById("helpBtn");
 
 function stepCount(){ return 6; }
+
+const VK_ROWS = [
+  ["1","2","3","4","5","6","7","8","9","0","DELETE"],
+  ["Q","W","E","R","T","Y","U","I","O","P"],
+  ["A","S","D","F","G","H","J","K","L"],
+  ["Z","X","C","V","B","N","M","SPACE"]
+];
+
+const vkState = {
+  open: false,
+  targetId: "",
+  title: "",
+  maxLen: 80,
+  uppercase: false,
+  value: ""
+};
+
+function syncVirtualKeyboardToTarget(){
+  if(!vkState.targetId) return;
+  const target = document.getElementById(vkState.targetId);
+  if(!target) return;
+  target.value = vkState.value;
+  target.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function renderVirtualKeyboard(){
+  vkHead.textContent = vkState.title || "Enter details";
+  vkMirror.textContent = vkState.value || " ";
+  vkRows.innerHTML = "";
+
+  VK_ROWS.forEach(row => {
+    const rowEl = document.createElement("div");
+    rowEl.className = "vkRow";
+    rowEl.style.setProperty("--vk-cols", String(row.length));
+    row.forEach(key => {
+      const keyEl = document.createElement("button");
+      keyEl.type = "button";
+      keyEl.className = `vkKey ${key === "DELETE" || key === "SPACE" ? "action" : ""}`;
+      keyEl.dataset.key = key;
+      keyEl.textContent = key === "DELETE" ? "Delete" : (key === "SPACE" ? "Space" : key);
+      rowEl.appendChild(keyEl);
+    });
+    vkRows.appendChild(rowEl);
+  });
+}
+
+function closeVirtualKeyboard(){
+  vkState.open = false;
+  vkState.targetId = "";
+  vkWrap.classList.remove("show");
+  vkWrap.setAttribute("aria-hidden", "true");
+  chromeEl.classList.remove("keyboard-open");
+}
+
+function openVirtualKeyboard(input, options = {}){
+  if(!input || !input.id) return;
+  vkState.open = true;
+  vkState.targetId = input.id;
+  vkState.title = options.title || "Enter details";
+  vkState.maxLen = Number(options.maxLen || 80);
+  vkState.uppercase = !!options.uppercase;
+  vkState.value = String(input.value || "");
+
+  renderVirtualKeyboard();
+  vkWrap.classList.add("show");
+  vkWrap.setAttribute("aria-hidden", "false");
+  chromeEl.classList.add("keyboard-open");
+}
+
+function restoreVirtualKeyboard(){
+  if(!vkState.open) return;
+  if(state.step !== 4){
+    closeVirtualKeyboard();
+    return;
+  }
+  const target = document.getElementById(vkState.targetId);
+  if(!target){
+    closeVirtualKeyboard();
+    return;
+  }
+  vkState.value = String(target.value || vkState.value || "");
+  renderVirtualKeyboard();
+  vkWrap.classList.add("show");
+  vkWrap.setAttribute("aria-hidden", "false");
+  chromeEl.classList.add("keyboard-open");
+}
+
+function bindKioskKeyboard(input, options = {}){
+  if(!input || !input.id) return;
+  input.readOnly = true;
+  input.classList.add("kioskKeyboardInput");
+  const open = () => openVirtualKeyboard(input, options);
+  input.addEventListener("click", open);
+  input.addEventListener("focus", open);
+}
+
+vkRows.addEventListener("click", (event)=>{
+  const keyBtn = event.target.closest(".vkKey");
+  if(!keyBtn) return;
+  const key = keyBtn.dataset.key;
+  if(!key || !vkState.open) return;
+
+  if(key === "DELETE"){
+    vkState.value = vkState.value.slice(0, -1);
+  } else if(key === "SPACE"){
+    vkState.value += " ";
+  } else {
+    vkState.value += key;
+  }
+
+  if(vkState.uppercase){
+    vkState.value = vkState.value.toUpperCase();
+  }
+  if(Number.isFinite(vkState.maxLen) && vkState.maxLen > 0){
+    vkState.value = vkState.value.slice(0, vkState.maxLen);
+  }
+  vkMirror.textContent = vkState.value || " ";
+  syncVirtualKeyboardToTarget();
+});
+
+vkCancelBtn.addEventListener("click", ()=> closeVirtualKeyboard());
+vkDoneBtn.addEventListener("click", ()=> closeVirtualKeyboard());
 
 function updateProgress(){
   if(state.step === 0){
@@ -1623,6 +1839,7 @@ function navigateToStep(targetStep){
     return;
   }
   if(isScreenTransitioning) return;
+  closeVirtualKeyboard();
   isScreenTransitioning = true;
 
   const overlay = document.createElement("div");
@@ -1761,6 +1978,7 @@ function render(){
   else if(state.step === 5) renderBasketAndPay();
   else renderPrintAndConfirm();
   updateBreadcrumb();
+  restoreVirtualKeyboard();
 
   // Hide primary footer action on in-screen tap flows.
   if(state.step === 0 || state.step === 1 || state.step === 2 || (state.step === 4 && state.evriScreeningOpen)){
@@ -2903,6 +3121,11 @@ function renderFilterAndPresentOptions(){
   const sa = document.getElementById("senderAddressInput");
   const pod = document.getElementById("proofDeliveryInput");
 
+  bindKioskKeyboard(rp, { title:"Enter recipient postcode", maxLen:10, uppercase:true });
+  bindKioskKeyboard(ra, { title:"Enter recipient address", maxLen:80, uppercase:false });
+  bindKioskKeyboard(sp, { title:"Enter sender postcode", maxLen:10, uppercase:true });
+  bindKioskKeyboard(sa, { title:"Enter sender address", maxLen:80, uppercase:false });
+
   rp.addEventListener("input", (e)=>{
     const prevNI = isBTPostcode(state.recipientPostcode);
     const prevGBToNI = isGBToNIJourney();
@@ -2949,6 +3172,7 @@ function renderFilterAndPresentOptions(){
 
   const niRef = document.getElementById("niReferenceInput");
   const niConfirm = document.getElementById("niConfirmed");
+  bindKioskKeyboard(niRef, { title:"Enter NI/Windsor reference", maxLen:40, uppercase:true });
   if(niRef){
     niRef.addEventListener("input", (e)=>{ state.niCustomsReference = (e.target.value || "").slice(0, 40); e.target.value = state.niCustomsReference; });
   }
@@ -2987,6 +3211,7 @@ function renderFilterAndPresentOptions(){
   });
 
   const rmNiPlantCertRefInput = document.getElementById("rmNiPlantCertRefInput");
+  bindKioskKeyboard(rmNiPlantCertRefInput, { title:"Enter plant/flower certificate reference", maxLen:40, uppercase:true });
   if(rmNiPlantCertRefInput){
     rmNiPlantCertRefInput.addEventListener("input", (e)=>{
       state.rmNiPlantCertRef = (e.target.value || "").slice(0, 40);
