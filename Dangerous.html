@@ -252,7 +252,7 @@
     }
     .flowShell{
       display:grid;
-      grid-template-columns:1fr;
+      grid-template-columns:minmax(0,1fr) 300px;
       gap:14px;
       margin-top:14px;
       align-items:start;
@@ -278,7 +278,28 @@
       display:flex;align-items:center;justify-content:space-between;gap:12px;
       padding:16px;border-top:1px solid var(--border);background:#fff;
     }
-    .progress{color:var(--muted);font-weight:800;font-size:13px;}
+    .progress{
+      color:var(--muted);
+      font-weight:800;
+      font-size:13px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      text-align:center;
+    }
+    .progress .wireframeFlag{
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid #f1d6a8;
+      background:#fff5df;
+      color:#7b4f00;
+      font-size:11px;
+      font-weight:900;
+      line-height:1;
+    }
     .tag{
       display:inline-flex;gap:6px;align-items:center;
       padding:7px 10px;border-radius:999px;border:1px solid var(--border);
@@ -322,7 +343,7 @@
 
     <div class="bottombar">
       <button class="btn danger" id="cancelBtn"><span class="material-symbols-outlined">close</span>Cancel</button>
-      <div class="progress" id="progress">Step 1 of 6</div>
+      <div class="progress" id="progress">Step 1 of 6 <span class="wireframeFlag">Journey wireframe only</span></div>
       <button class="btn primary" id="nextBtn">Continue <span class="material-symbols-outlined">arrow_forward</span></button>
     </div>
   </div>
@@ -1307,7 +1328,7 @@ const helpBtn = document.getElementById("helpBtn");
 function stepCount(){ return 6; }
 
 function updateProgress(){
-  progress.textContent = `Step ${state.step} of ${stepCount()}`;
+  progress.innerHTML = `Step ${state.step} of ${stepCount()} <span class="wireframeFlag">Journey wireframe only</span>`;
   backBtn.disabled = (state.step === 1);
 }
 
@@ -2259,117 +2280,122 @@ function renderFilterAndPresentOptions(){
       <span class="pill"><span class="material-symbols-outlined">tune</span> Service filtering</span>
     </div>
 
-    <div class="formRow stack">
-      <div class="card">
-        <h3>Service filtering (KIOSK-413 / KIOSK-415 / KIOSK-428)</h3>
-        <h3 style="margin-top:14px;">Available services (KIOSK-414)</h3>
-        <div class="choiceGroup" id="serviceChoices">
-          ${services.length ? services.map(service => `
-            <button type="button" class="choiceBtn ${state.selectedServiceId===service.id?"active":""}" data-service-id="${service.id}">
-              <span>${escapeHtml(service.name)}</span>
-              <span class="sub">${service.tracked ? "Tracked" : "Untracked"} • £${calculateServicePrice(service).toFixed(2)}</span>
-            </button>
-          `).join("") : `
-            <div class="banner danger show" style="display:block;">No services available for current filters. Adjust speed or item details.</div>
-          `}
-        </div>
-      </div>
-
-      <div class="card">
-        <h3>Enter address details (KIOSK-866)</h3>
-        <p>Recipient details</p>
-        <input id="recipientPostcodeInput" placeholder="Recipient postcode (e.g. SW1A 1AA)" value="${escapeHtml(state.recipientPostcode)}" />
-        <input id="recipientAddressInput" placeholder="Recipient address line" value="${escapeHtml(state.recipientAddress)}" style="margin-top:8px;" />
-        <p style="margin-top:10px;">Sender details</p>
-        <input id="senderPostcodeInput" placeholder="Sender postcode" value="${escapeHtml(state.senderPostcode)}" />
-        <input id="senderAddressInput" placeholder="Sender address line" value="${escapeHtml(state.senderAddress)}" style="margin-top:8px;" />
-
-        ${showNI ? `
-      <h3 style="margin-top:14px;">Northern Ireland / Windsor checks (KIOSK-867)</h3>
-      <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Does parcel include sanitary/phytosanitary goods (e.g. meat, dairy, plants)?</p>
-      <div class="choiceRow" id="niSpsChoices">
-        <button type="button" class="choiceBtn ${state.niSpsCategory==="no"?"active":""}" data-value="no"><span>No</span></button>
-        <button type="button" class="choiceBtn ${state.niSpsCategory==="yes"?"active":""}" data-value="yes"><span>Yes</span></button>
-      </div>
-      <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Is this being sent to a private individual?</p>
-      <div class="choiceRow" id="niPrivateChoices">
-        <button type="button" class="choiceBtn ${state.niPrivateIndividual==="yes"?"active":""}" data-value="yes"><span>Yes</span></button>
-        <button type="button" class="choiceBtn ${state.niPrivateIndividual==="no"?"active":""}" data-value="no"><span>No</span></button>
-      </div>
-      <input id="niReferenceInput" placeholder="NI/Windsor declaration reference" value="${escapeHtml(state.niCustomsReference)}" style="margin-top:8px;" />
-      <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-weight:700;">
-        <input type="checkbox" id="niConfirmed" ${state.niCustomsConfirmed ? "checked" : ""}/>
-        <span>I confirm NI/Windsor information has been captured and validated.</span>
-      </label>
-
-      ${showRMNISpecial && selectedRMRule.niRule === "live_creatures_forbidden" ? `
-        <div class="banner danger show" style="display:block; margin-top:10px;">
-          ${escapeHtml(niStatus.message || "This selected Royal Mail category is blocked for Great Britain to Northern Ireland journeys.")}
-        </div>
-      ` : ""}
-
-      ${showRMNISpecial && selectedRMRule.niRule === "perishable_extra" ? `
-        <h3 style="margin-top:14px;">Additional RM perishable checks</h3>
-        ${state.niSpsCategory === "yes" ? `
-          <div class="choiceGroup" id="rmPerishableRouteChoices" style="margin-top:8px;">
-            <button type="button" class="choiceBtn ${state.rmNiPerishableRoute==="confectionery_only"?"active":""}" data-value="confectionery_only">
-              <span>Confectionery only</span>
-              <span class="sub">No meat/dairy/pet food</span>
-            </button>
-            <button type="button" class="choiceBtn ${state.rmNiPerishableRoute==="plants_certified"?"active":""}" data-value="plants_certified">
-              <span>Flowers/plants with certification</span>
-              <span class="sub">Certification required</span>
-            </button>
-            <button type="button" class="choiceBtn ${state.rmNiPerishableRoute==="contains_prohibited"?"active":""}" data-value="contains_prohibited">
-              <span>Contains restricted meat/dairy/pet food</span>
-              <span class="sub">Blocked</span>
-            </button>
+    <div class="flowShell">
+      <div class="flowMain">
+        <div class="formRow stack">
+          <div class="card">
+            <h3>Service filtering (KIOSK-413 / KIOSK-415 / KIOSK-428)</h3>
+            <h3 style="margin-top:14px;">Available services (KIOSK-414)</h3>
+            <div class="choiceGroup" id="serviceChoices">
+              ${services.length ? services.map(service => `
+                <button type="button" class="choiceBtn ${state.selectedServiceId===service.id?"active":""}" data-service-id="${service.id}">
+                  <span>${escapeHtml(service.name)}</span>
+                  <span class="sub">${service.tracked ? "Tracked" : "Untracked"} • £${calculateServicePrice(service).toFixed(2)}</span>
+                </button>
+              `).join("") : `
+                <div class="banner danger show" style="display:block;">No services available for current filters. Adjust speed or item details.</div>
+              `}
+            </div>
           </div>
-          ${state.rmNiPerishableRoute === "plants_certified" ? `
-            <input id="rmNiPlantCertRefInput" placeholder="Plant/flower certification reference" value="${escapeHtml(state.rmNiPlantCertRef)}" style="margin-top:8px;" />
+
+          <div class="card">
+            <h3>Enter address details (KIOSK-866)</h3>
+            <p>Recipient details</p>
+            <input id="recipientPostcodeInput" placeholder="Recipient postcode (e.g. SW1A 1AA)" value="${escapeHtml(state.recipientPostcode)}" />
+            <input id="recipientAddressInput" placeholder="Recipient address line" value="${escapeHtml(state.recipientAddress)}" style="margin-top:8px;" />
+            <p style="margin-top:10px;">Sender details</p>
+            <input id="senderPostcodeInput" placeholder="Sender postcode" value="${escapeHtml(state.senderPostcode)}" />
+            <input id="senderAddressInput" placeholder="Sender address line" value="${escapeHtml(state.senderAddress)}" style="margin-top:8px;" />
+
+            ${showNI ? `
+          <h3 style="margin-top:14px;">Northern Ireland / Windsor checks (KIOSK-867)</h3>
+          <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Does parcel include sanitary/phytosanitary goods (e.g. meat, dairy, plants)?</p>
+          <div class="choiceRow" id="niSpsChoices">
+            <button type="button" class="choiceBtn ${state.niSpsCategory==="no"?"active":""}" data-value="no"><span>No</span></button>
+            <button type="button" class="choiceBtn ${state.niSpsCategory==="yes"?"active":""}" data-value="yes"><span>Yes</span></button>
+          </div>
+          <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Is this being sent to a private individual?</p>
+          <div class="choiceRow" id="niPrivateChoices">
+            <button type="button" class="choiceBtn ${state.niPrivateIndividual==="yes"?"active":""}" data-value="yes"><span>Yes</span></button>
+            <button type="button" class="choiceBtn ${state.niPrivateIndividual==="no"?"active":""}" data-value="no"><span>No</span></button>
+          </div>
+          <input id="niReferenceInput" placeholder="NI/Windsor declaration reference" value="${escapeHtml(state.niCustomsReference)}" style="margin-top:8px;" />
+          <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-weight:700;">
+            <input type="checkbox" id="niConfirmed" ${state.niCustomsConfirmed ? "checked" : ""}/>
+            <span>I confirm NI/Windsor information has been captured and validated.</span>
+          </label>
+
+          ${showRMNISpecial && selectedRMRule.niRule === "live_creatures_forbidden" ? `
+            <div class="banner danger show" style="display:block; margin-top:10px;">
+              ${escapeHtml(niStatus.message || "This selected Royal Mail category is blocked for Great Britain to Northern Ireland journeys.")}
+            </div>
           ` : ""}
-        ` : ""}
-        ${niStatus.message ? `
-          <div class="banner ${niStatus.blocked ? "danger" : "warn"} show" style="display:block; margin-top:10px;">
-            ${escapeHtml(niStatus.message)}
+
+          ${showRMNISpecial && selectedRMRule.niRule === "perishable_extra" ? `
+            <h3 style="margin-top:14px;">Additional RM perishable checks</h3>
+            ${state.niSpsCategory === "yes" ? `
+              <div class="choiceGroup" id="rmPerishableRouteChoices" style="margin-top:8px;">
+                <button type="button" class="choiceBtn ${state.rmNiPerishableRoute==="confectionery_only"?"active":""}" data-value="confectionery_only">
+                  <span>Confectionery only</span>
+                  <span class="sub">No meat/dairy/pet food</span>
+                </button>
+                <button type="button" class="choiceBtn ${state.rmNiPerishableRoute==="plants_certified"?"active":""}" data-value="plants_certified">
+                  <span>Flowers/plants with certification</span>
+                  <span class="sub">Certification required</span>
+                </button>
+                <button type="button" class="choiceBtn ${state.rmNiPerishableRoute==="contains_prohibited"?"active":""}" data-value="contains_prohibited">
+                  <span>Contains restricted meat/dairy/pet food</span>
+                  <span class="sub">Blocked</span>
+                </button>
+              </div>
+              ${state.rmNiPerishableRoute === "plants_certified" ? `
+                <input id="rmNiPlantCertRefInput" placeholder="Plant/flower certification reference" value="${escapeHtml(state.rmNiPlantCertRef)}" style="margin-top:8px;" />
+              ` : ""}
+            ` : ""}
+            ${niStatus.message ? `
+              <div class="banner ${niStatus.blocked ? "danger" : "warn"} show" style="display:block; margin-top:10px;">
+                ${escapeHtml(niStatus.message)}
+              </div>
+            ` : ""}
+          ` : ""}
+            ` : ""}
+
+            <label style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-weight:700;">
+              <input type="checkbox" id="proofDeliveryInput" ${state.proofOfDelivery ? "checked" : ""}/>
+              <span>Offer proof of delivery optional add-on (KIOSK-416)</span>
+            </label>
+
+            ${needsEvriAdditional ? `
+          <h3 style="margin-top:14px;">EVRi/DPD additional screening</h3>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+            <button type="button" class="btn" id="openEvriScreeningBtn">
+              <span class="material-symbols-outlined">fact_check</span>Open EVRi/DPD screening screens
+            </button>
+            <button type="button" class="btn ghost" id="resetEvriScreeningBtn">
+              <span class="material-symbols-outlined">restart_alt</span>Reset screening
+            </button>
           </div>
-        ` : ""}
-      ` : ""}
-        ` : ""}
-
-        <label style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-weight:700;">
-          <input type="checkbox" id="proofDeliveryInput" ${state.proofOfDelivery ? "checked" : ""}/>
-          <span>Offer proof of delivery optional add-on (KIOSK-416)</span>
-        </label>
-
-        ${needsEvriAdditional ? `
-      <h3 style="margin-top:14px;">EVRi/DPD additional screening</h3>
-      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
-        <button type="button" class="btn" id="openEvriScreeningBtn">
-          <span class="material-symbols-outlined">fact_check</span>Open EVRi/DPD screening screens
-        </button>
-        <button type="button" class="btn ghost" id="resetEvriScreeningBtn">
-          <span class="material-symbols-outlined">restart_alt</span>Reset screening
-        </button>
+          ${state.evriAdditionalSelection==="blocked" ? `
+            <div class="banner danger show" style="display:block; margin-top:10px;">EVRi/DPD prohibited item selected. Cannot proceed with this service.</div>
+          ` : state.evriScreeningComplete ? `
+            <div class="banner ok show" style="display:block; margin-top:10px;">EVRi/DPD additional screening passed.</div>
+          ` : `
+            <div class="banner warn show" style="display:block; margin-top:10px;">Complete EVRi/DPD screening screens before continuing.</div>
+          `}
+            ` : ""}
+          </div>
+        </div>
       </div>
-      ${state.evriAdditionalSelection==="blocked" ? `
-        <div class="banner danger show" style="display:block; margin-top:10px;">EVRi/DPD prohibited item selected. Cannot proceed with this service.</div>
-      ` : state.evriScreeningComplete ? `
-        <div class="banner ok show" style="display:block; margin-top:10px;">EVRi/DPD additional screening passed.</div>
-      ` : `
-        <div class="banner warn show" style="display:block; margin-top:10px;">Complete EVRi/DPD screening screens before continuing.</div>
-      `}
-        ` : ""}
-      </div>
-
-      <div class="card">
-        <h3>Journey note</h3>
-        <p style="margin:0 0 8px; color:var(--muted);">${escapeHtml(narrativeSpeed)}</p>
-        <p style="margin:0 0 8px; color:var(--muted);">${escapeHtml(narrativeRM)}</p>
-        <p style="margin:0 0 8px; color:var(--muted);">${escapeHtml(narrativeNI)}</p>
-        ${narrativeNIRule ? `<p style="margin:0 0 8px; color:var(--muted);">${escapeHtml(narrativeNIRule)}</p>` : ""}
-        <p style="margin:0; color:var(--muted);">${escapeHtml(narrativeCarrier)}</p>
-      </div>
+      <aside class="flowAside">
+        <div class="flowNarrative">
+          <h4>Journey Note</h4>
+          <p>${escapeHtml(narrativeSpeed)}</p>
+          <p>${escapeHtml(narrativeRM)}</p>
+          <p>${escapeHtml(narrativeNI)}</p>
+          ${narrativeNIRule ? `<p>${escapeHtml(narrativeNIRule)}</p>` : ""}
+          <p>${escapeHtml(narrativeCarrier)}</p>
+        </div>
+      </aside>
     </div>
   `;
 
