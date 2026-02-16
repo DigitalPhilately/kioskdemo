@@ -315,6 +315,68 @@
     }
     .flowNarrative p{margin:0 0 8px;}
     .flowNarrative p:last-child{margin-bottom:0;}
+    .scalePromptPanel{
+      border:1px solid var(--border);
+      background:#fff;
+      border-radius:20px;
+      padding:26px 20px;
+      text-align:center;
+      box-shadow:0 6px 18px rgba(20,40,74,.08);
+    }
+    .scalePromptIcon{
+      width:72px;
+      height:72px;
+      margin:0 auto 12px;
+      border-radius:16px;
+      background:#e6effa;
+      color:var(--accent);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .scalePromptIcon .material-symbols-outlined{font-size:40px;}
+    .scalePromptTitle{
+      margin:0;
+      color:#17334f;
+      font-size:38px;
+      line-height:1.12;
+      font-weight:900;
+      letter-spacing:.1px;
+    }
+    .scalePromptText{
+      margin:10px 0 8px;
+      color:var(--muted);
+      font-size:21px;
+      font-weight:700;
+    }
+    .scalePromptArrow{
+      margin-top:8px;
+      color:var(--accent);
+      font-size:30px;
+      line-height:1;
+      font-weight:900;
+    }
+    .weighAssist{
+      margin-top:14px;
+      padding:16px;
+      border:1px solid var(--border);
+      border-radius:16px;
+      background:#f7faff;
+    }
+    .weighAssist h3{
+      margin:0 0 8px;
+      font-size:19px;
+      color:#18324f;
+    }
+    .weighAssist p{
+      margin:0 0 10px;
+      color:var(--muted);
+      font-size:15px;
+    }
+    .weighAssist .demoToggleRow{
+      margin-top:8px;
+      justify-content:flex-start;
+    }
     .bottombar{
       display:flex;align-items:center;justify-content:space-between;gap:12px;
       padding:16px 18px;border-top:1px solid var(--border);background:#fff;
@@ -358,6 +420,10 @@
       .card p{font-size:15px;}
       input,select{font-size:18px;min-height:52px;}
       .helpNote{font-size:14px;}
+      .scalePromptPanel{padding:20px 14px;}
+      .scalePromptTitle{font-size:30px;}
+      .scalePromptText{font-size:18px;}
+      .scalePromptArrow{font-size:24px;}
       .grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;}
       .formRow{grid-template-columns:1fr;}
       .flowShell{grid-template-columns:1fr;}
@@ -1480,11 +1546,16 @@ function render(){
 }
 
 function renderWeigh(){
+  if(!state.destination){
+    state.destination = "uk";
+  }
+  setDestinationPill();
+
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Item On Scales</h1>
-        <p class="subtitle">Customer selects Post an Item, then capture weight and destination before dangerous goods screening.</p>
+        <h1>Place Item On Scales</h1>
+        <p class="subtitle">Place your item on the scales with the address facing up.</p>
       </div>
       <span class="pill"><span class="material-symbols-outlined">scale</span> Item On Scales (KIOSK-404)</span>
     </div>
@@ -1492,10 +1563,16 @@ function renderWeigh(){
     <div class="flowShell">
       <div class="flowMain">
         <div class="card">
-          <h3>Capture weight (KIOSK-404)</h3>
-          <p>In production this is captured automatically from scales. Kiosk supports up to max system weight.</p>
-          <input id="weightInput" inputmode="numeric" placeholder="e.g. 350" value="${escapeHtml(state.weightG)}" />
-          <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Destination</p>
+          <div class="scalePromptPanel">
+            <div class="scalePromptIcon"><span class="material-symbols-outlined">scale</span></div>
+            <h2 class="scalePromptTitle">Place your item on the scales with the address facing up</h2>
+            <p class="scalePromptText">Scales are just above the screen</p>
+            <div class="scalePromptArrow">↑</div>
+          </div>
+
+          <div class="weighAssist">
+            <h3>Destination</h3>
+            <p>R1.0 defaults to UK (Inc NI). Change only if posting International.</p>
           <div class="choiceGroup">
             <div class="choiceRow" id="destChoices">
               <button type="button" class="choiceBtn ${state.destination==="uk"?"active":""}" data-value="uk">
@@ -1508,19 +1585,24 @@ function renderWeigh(){
               </button>
             </div>
           </div>
-          <div class="demoToggleRow">
-            <label class="demoToggle">
-              <span>Demo fast-track</span>
-              <input type="checkbox" id="quickDemoToggle" ${state.quickDemoMode ? "checked" : ""}/>
-              <span class="track"><span class="thumb"></span></span>
-            </label>
+
+            <p style="margin-top:12px;">Demo only: enter sample scale value (grams)</p>
+            <input id="weightInput" inputmode="numeric" placeholder="e.g. 350" value="${escapeHtml(state.weightG)}" />
+
+            <div class="demoToggleRow">
+              <label class="demoToggle">
+                <span>Demo fast-track</span>
+                <input type="checkbox" id="quickDemoToggle" ${state.quickDemoMode ? "checked" : ""}/>
+                <span class="track"><span class="thumb"></span></span>
+              </label>
+            </div>
           </div>
         </div>
       </div>
       <aside class="flowAside">
         <div class="flowNarrative">
           <h4>Journey Note</h4>
-          <p>Customer selects "Post an Item" (KIOSK-402) to launch the flow. In R1.0 the destination will default to UK (Inc NI) but in R1.1 the customer will have to select the destination before proceeding.</p>
+          <p>Customer selects "Post an Item" (KIOSK-402) to launch the flow. In R1.0 destination defaults to UK (Inc NI); in R1.1 customers must select destination before proceeding.</p>
           <p>Next step is Royal Mail dangerous goods screening (KIOSK-410).</p>
         </div>
       </aside>
