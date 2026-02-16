@@ -356,6 +356,61 @@
       line-height:1;
       font-weight:900;
     }
+    .weightConfirmCard{
+      margin-top:14px;
+      border:1px solid var(--border);
+      border-radius:18px;
+      background:#fff;
+      padding:18px;
+      display:grid;
+      grid-template-columns:1.2fr .8fr;
+      gap:16px;
+      align-items:center;
+    }
+    .weightCopy{
+      text-align:center;
+    }
+    .weightCopy .label{
+      margin:0;
+      color:var(--muted);
+      font-size:20px;
+      font-weight:700;
+    }
+    .weightCopy .value{
+      margin:2px 0 0;
+      color:#17334f;
+      font-size:56px;
+      font-weight:900;
+      line-height:1;
+    }
+    .weightItemVisual{
+      border:1px dashed #b8cbe3;
+      border-radius:16px;
+      min-height:160px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:#f5f9ff;
+      color:#2e7ab8;
+      font-size:72px;
+    }
+    .weightActions{
+      display:grid;
+      grid-template-columns:1fr 1.4fr;
+      gap:12px;
+      margin-top:14px;
+    }
+    .weightActions .btn{
+      min-height:64px;
+      justify-content:center;
+      font-size:20px;
+      font-weight:900;
+    }
+    .btn.secondary{
+      background:#fff;
+      border-color:#cfd9e8;
+      color:#445671;
+    }
     .weighAssist{
       margin-top:14px;
       padding:16px;
@@ -424,6 +479,12 @@
       .scalePromptTitle{font-size:30px;}
       .scalePromptText{font-size:18px;}
       .scalePromptArrow{font-size:24px;}
+      .weightConfirmCard{grid-template-columns:1fr;padding:14px;}
+      .weightCopy .label{font-size:17px;}
+      .weightCopy .value{font-size:42px;}
+      .weightItemVisual{min-height:120px;font-size:56px;}
+      .weightActions{grid-template-columns:1fr;}
+      .weightActions .btn{font-size:18px;min-height:58px;}
       .grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;}
       .formRow{grid-template-columns:1fr;}
       .flowShell{grid-template-columns:1fr;}
@@ -1524,7 +1585,7 @@ function render(){
   updateBreadcrumb();
 
   // Hide primary footer action on in-screen tap flows.
-  if(state.step === 2 || (state.step === 4 && state.evriScreeningOpen)){
+  if(state.step === 1 || state.step === 2 || (state.step === 4 && state.evriScreeningOpen)){
     nextBtn.style.visibility = "hidden";
     nextBtn.style.pointerEvents = "none";
   } else {
@@ -1570,24 +1631,43 @@ function renderWeigh(){
             <div class="scalePromptArrow">↑</div>
           </div>
 
-          <div class="weighAssist">
-            <h3>Destination</h3>
-            <p>R1.0 defaults to UK (Inc NI). Change only if posting International.</p>
-          <div class="choiceGroup">
-            <div class="choiceRow" id="destChoices">
-              <button type="button" class="choiceBtn ${state.destination==="uk"?"active":""}" data-value="uk">
-                <span>🇬🇧 UK</span>
-                <span class="sub">Inland</span>
-              </button>
-              <button type="button" class="choiceBtn ${state.destination==="intl"?"active":""}" data-value="intl">
-                <span>🌍 International</span>
-                <span class="sub">Overseas</span>
-              </button>
+          <div class="weightConfirmCard">
+            <div class="weightCopy">
+              <p class="label">Your item weighs</p>
+              <p class="value" id="weightReadout">${state.weightG ? `${escapeHtml(state.weightG)}g` : "--g"}</p>
+            </div>
+            <div class="weightItemVisual">
+              <span class="material-symbols-outlined">inventory_2</span>
             </div>
           </div>
 
+          <div class="weighAssist">
+            <h3>Destination</h3>
+            <p>R1.0 defaults to UK (Inc NI). Change only if posting International.</p>
+            <div class="choiceGroup">
+              <div class="choiceRow" id="destChoices">
+                <button type="button" class="choiceBtn ${state.destination==="uk"?"active":""}" data-value="uk">
+                  <span>🇬🇧 UK</span>
+                  <span class="sub">Inland</span>
+                </button>
+                <button type="button" class="choiceBtn ${state.destination==="intl"?"active":""}" data-value="intl">
+                  <span>🌍 International</span>
+                  <span class="sub">Overseas</span>
+                </button>
+              </div>
+            </div>
+
             <p style="margin-top:12px;">Demo only: enter sample scale value (grams)</p>
             <input id="weightInput" inputmode="numeric" placeholder="e.g. 350" value="${escapeHtml(state.weightG)}" />
+
+            <div class="weightActions">
+              <button type="button" class="btn secondary" id="weightRetryBtn">
+                <span class="material-symbols-outlined">replay</span>Try again
+              </button>
+              <button type="button" class="btn primary" id="weightConfirmBtn">
+                <span class="material-symbols-outlined">check_circle</span>Weight is correct
+              </button>
+            </div>
 
             <div class="demoToggleRow">
               <label class="demoToggle">
@@ -1611,6 +1691,10 @@ function renderWeigh(){
   document.getElementById("weightInput").addEventListener("input", (e)=> {
     state.weightG = e.target.value.replace(/[^\d]/g,"").slice(0,6);
     e.target.value = state.weightG;
+    const readout = document.getElementById("weightReadout");
+    if(readout){
+      readout.textContent = state.weightG ? `${state.weightG}g` : "--g";
+    }
     state.selectedServiceId = "";
     state.productProfile = "royal_mail";
     state.evriAdditionalSelection = "";
@@ -1618,6 +1702,29 @@ function renderWeigh(){
     state.evriScreeningComplete = false;
     state.evriLossOnlySelected = false;
     state.evriNoCompSelected = false;
+  });
+  document.getElementById("weightRetryBtn").addEventListener("click", ()=>{
+    state.weightG = "";
+    const input = document.getElementById("weightInput");
+    const readout = document.getElementById("weightReadout");
+    if(input){
+      input.value = "";
+      input.focus();
+    }
+    if(readout){
+      readout.textContent = "--g";
+    }
+  });
+  document.getElementById("weightConfirmBtn").addEventListener("click", ()=>{
+    if(!state.weightG){
+      alert("Capture weight before continuing.");
+      return;
+    }
+    if(!state.destination){
+      alert("Select a destination before continuing.");
+      return;
+    }
+    next();
   });
   document.querySelectorAll("#destChoices .choiceBtn").forEach(btn=>{
     btn.addEventListener("click", ()=>{
