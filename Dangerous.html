@@ -833,6 +833,7 @@ const state = {
   rmNiPlantCertRef: "",
   proofOfDelivery: false,
   selectedServiceId: "",
+  filterFlowStage: "service",
   basketAdded: false,
   paymentMethod: "",
   paymentComplete: false,
@@ -2147,7 +2148,9 @@ function render(){
   } else if(state.step === 5){
     nextBtn.innerHTML = `Proceed to print <span class="material-symbols-outlined">arrow_forward</span>`;
   } else if(state.step === 4){
-    nextBtn.innerHTML = `Add to basket <span class="material-symbols-outlined">add_shopping_cart</span>`;
+    nextBtn.innerHTML = state.filterFlowStage === "address"
+      ? `Add to basket <span class="material-symbols-outlined">add_shopping_cart</span>`
+      : `Continue to address details <span class="material-symbols-outlined">arrow_forward</span>`;
   } else if(state.step === 3){
     nextBtn.innerHTML = `Filter services <span class="material-symbols-outlined">filter_list</span>`;
   } else {
@@ -3041,13 +3044,24 @@ function renderFilterAndPresentOptions(){
   const showRMNISpecial = showGBToNI && selectedRMRule && !!selectedRMRule.niRule;
   const chosenService = selectedService();
   const needsEvriAdditional = !!(chosenService && chosenService.profile === "evri_dpd");
-  if(!needsEvriAdditional && state.evriScreeningOpen){
-    state.evriScreeningOpen = false;
-  }
-  if(needsEvriAdditional && state.evriScreeningOpen){
-    renderEvriAdditionalScreening();
-    return;
-  }
+  const setSelectedService = (serviceId)=>{
+    state.selectedServiceId = serviceId || "";
+    const chosen = selectedService();
+    state.productProfile = chosen ? chosen.profile : "royal_mail";
+    if(state.productProfile !== "evri_dpd"){
+      state.evriScreeningOpen = false;
+      state.evriAdditionalSelection = "";
+      state.evriSelectedProhibitedKey = null;
+      state.evriAdditionalBlocked = false;
+      state.evriScreeningComplete = false;
+      state.evriLossOnlySelected = false;
+      state.evriNoCompSelected = false;
+      state.coverLossOnlyKeys = new Set();
+      state.coverNoCompKeys = new Set();
+    } else if(state.productProfile === "evri_dpd"){
+      state.evriScreeningOpen = false;
+    }
+  };
   const evriProhibitedLabel = state.evriSelectedProhibitedKey
     ? (PROHIBITED.find(x => x.key === state.evriSelectedProhibitedKey)?.label || state.evriSelectedProhibitedKey)
     : "Other / not listed";
@@ -3057,7 +3071,9 @@ function renderFilterAndPresentOptions(){
   const narrativeRM = selectedRMRule
     ? `RM DG selection: ${selectedRMRule.label}${state.rmConditionSatisfied ? " (conditions complete)." : " (conditions pending)."}` 
     : "RM DG selection: not set.";
-  const narrativeCarrier = needsEvriAdditional
+  const narrativeCarrier = !chosenService
+    ? "Select a postage product to determine carrier screening requirements."
+    : needsEvriAdditional
     ? `EVRi/DPD screening: ${state.evriScreeningComplete ? "complete" : "pending"}${state.evriAdditionalSelection === "blocked" ? ` (blocked by ${evriProhibitedLabel})` : ""}.`
     : "Carrier-specific EVRi/DPD screening not required for current service.";
   const narrativeNI = showNI
@@ -3067,21 +3083,24 @@ function renderFilterAndPresentOptions(){
     ? `NI route rule: ${niStatus.message}`
     : "";
 
-  screen.innerHTML = `
-    <div class="stepHeader">
-      <div>
-        <h1>Filter and Present Postage Options (KIOSK-412)</h1>
-        <p class="subtitle">Apply delivery preference, restrictions, and routing to present valid services.</p>
+  if(state.filterFlowStage !== "address"){
+    if(state.evriScreeningOpen){
+      state.evriScreeningOpen = false;
+    }
+    screen.innerHTML = `
+      <div class="stepHeader">
+        <div>
+          <h1>Select postage product (KIOSK-414)</h1>
+          <p class="subtitle">Choose a product to continue to destination address entry.</p>
+        </div>
+        <span class="pill"><span class="material-symbols-outlined">tune</span> Service filtering</span>
       </div>
-      <span class="pill"><span class="material-symbols-outlined">tune</span> Service filtering</span>
-    </div>
 
-    <div class="flowShell">
-      <div class="flowMain">
-        <div class="formRow stack">
+      <div class="flowShell">
+        <div class="flowMain">
           <div class="card">
             <h3>Service filtering (KIOSK-413 / KIOSK-415 / KIOSK-428)</h3>
-            <h3 style="margin-top:14px;">Available services (KIOSK-414)</h3>
+            <h3 style="margin-top:14px;">Available services</h3>
             <div class="choiceGroup" id="serviceChoices">
               ${services.length ? services.map(service => `
                 <button type="button" class="choiceBtn ${state.selectedServiceId===service.id?"active":""}" data-service-id="${service.id}">
@@ -3092,6 +3111,65 @@ function renderFilterAndPresentOptions(){
                 <div class="banner danger show" style="display:block;">No services available for current filters. Adjust speed or item details.</div>
               `}
             </div>
+            <div class="helpNote" style="margin-top:12px;">
+              Select a postage product, then press <strong>Continue to address details</strong>.
+            </div>
+          </div>
+        </div>
+        <aside class="flowAside">
+          <div class="flowNarrative">
+            <h4>Journey Note</h4>
+            <p>${escapeHtml(narrativeSpeed)}</p>
+            <p>${escapeHtml(narrativeRM)}</p>
+            <p>${escapeHtml(narrativeCarrier)}</p>
+          </div>
+        </aside>
+      </div>
+    `;
+
+    document.querySelectorAll("#serviceChoices .choiceBtn[data-service-id]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        setSelectedService(btn.dataset.serviceId || "");
+        render();
+      });
+    });
+    return;
+  }
+
+  if(!needsEvriAdditional && state.evriScreeningOpen){
+    state.evriScreeningOpen = false;
+  }
+  if(needsEvriAdditional && state.evriScreeningOpen){
+    renderEvriAdditionalScreening();
+    return;
+  }
+
+  screen.innerHTML = `
+    <div class="stepHeader">
+      <div>
+        <h1>Enter destination address details (KIOSK-866)</h1>
+        <p class="subtitle">Capture recipient and sender details, then complete required checks.</p>
+      </div>
+      <span class="pill"><span class="material-symbols-outlined">location_on</span> Address entry</span>
+    </div>
+
+    <div class="flowShell">
+      <div class="flowMain">
+        <div class="formRow stack">
+          <div class="card">
+            <h3>Selected postage product (KIOSK-414)</h3>
+            ${chosenService ? `
+              <div class="helpNote">
+                <strong>Product:</strong> ${escapeHtml(chosenService.name)}<br/>
+                <strong>Indicative price:</strong> £${calculateServicePrice(chosenService).toFixed(2)}<br/>
+                <strong>Profile:</strong> ${chosenService.profile === "evri_dpd" ? "EVRi/DPD" : "Royal Mail"}
+              </div>
+            ` : `
+              <div class="banner danger show" style="display:block;">No product selected. Go back and choose a postage product first.</div>
+            `}
+            <button type="button" class="btn ghost" id="changeServiceBtn" style="margin-top:10px;">
+              <span class="material-symbols-outlined">arrow_back</span>Change product
+            </button>
           </div>
 
           <div class="card">
@@ -3195,27 +3273,13 @@ function renderFilterAndPresentOptions(){
     </div>
   `;
 
-  document.querySelectorAll("#serviceChoices .choiceBtn[data-service-id]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      state.selectedServiceId = btn.dataset.serviceId || "";
-      const chosen = selectedService();
-      state.productProfile = chosen ? chosen.profile : "royal_mail";
-      if(state.productProfile !== "evri_dpd"){
-        state.evriScreeningOpen = false;
-        state.evriAdditionalSelection = "";
-        state.evriSelectedProhibitedKey = null;
-        state.evriAdditionalBlocked = false;
-        state.evriScreeningComplete = false;
-        state.evriLossOnlySelected = false;
-        state.evriNoCompSelected = false;
-        state.coverLossOnlyKeys = new Set();
-        state.coverNoCompKeys = new Set();
-      } else if(state.productProfile === "evri_dpd"){
-        state.evriScreeningOpen = false;
-      }
+  const changeServiceBtn = document.getElementById("changeServiceBtn");
+  if(changeServiceBtn){
+    changeServiceBtn.addEventListener("click", ()=>{
+      state.filterFlowStage = "service";
       render();
     });
-  });
+  }
 
   const rp = document.getElementById("recipientPostcodeInput");
   const ra = document.getElementById("recipientAddressInput");
@@ -3660,6 +3724,9 @@ function canContinue(){
   }
 
   if(state.step === 4){
+    if(state.filterFlowStage !== "address"){
+      return !!state.selectedServiceId;
+    }
     if(state.evriScreeningOpen) return false;
     const hasAddresses = !!state.recipientPostcode && !!state.recipientAddress && !!state.senderPostcode && !!state.senderAddress;
     const hasService = !!state.selectedServiceId;
@@ -3707,6 +3774,10 @@ function next(){
       return;
     }
     if(state.step === 4){
+      if(state.filterFlowStage !== "address"){
+        alert("Select a postage product before continuing to address details.");
+        return;
+      }
       if(state.evriScreeningOpen){
         alert("Complete or close the EVRi/DPD screening screens before continuing.");
         return;
@@ -3731,6 +3802,16 @@ function next(){
     return;
   }
 
+  if(state.step === 3){
+    state.filterFlowStage = "service";
+  }
+
+  if(state.step === 4 && state.filterFlowStage !== "address"){
+    state.filterFlowStage = "address";
+    render();
+    return;
+  }
+
   if(state.step === 4){
     state.basketAdded = true;
   }
@@ -3739,6 +3820,11 @@ function next(){
 }
 
 function back(){
+  if(state.step === 4 && state.filterFlowStage === "address"){
+    state.filterFlowStage = "service";
+    render();
+    return;
+  }
   if(state.step > 0) navigateToStep(state.step - 1);
 }
 
@@ -3784,6 +3870,7 @@ function resetAll(){
   state.rmNiPlantCertRef = "";
   state.proofOfDelivery = false;
   state.selectedServiceId = "";
+  state.filterFlowStage = "service";
   state.basketAdded = false;
   state.paymentMethod = "";
   state.paymentComplete = false;
