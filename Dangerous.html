@@ -676,7 +676,7 @@
       gap:8px;
       text-align:center;
     }
-    .progress .wireframeFlag{
+    .wireframeFlag{
       display:inline-flex;
       align-items:center;
       gap:4px;
@@ -688,6 +688,166 @@
       font-size:12px;
       font-weight:900;
       line-height:1;
+    }
+    .basketReviewScreen{
+      border:1px solid var(--border);
+      border-radius:18px;
+      background:#fff;
+      overflow:hidden;
+    }
+    .basketReviewHeader{
+      min-height:76px;
+      border-bottom:1px solid var(--border);
+      display:grid;
+      grid-template-columns:56px minmax(0,1fr) 56px;
+      align-items:center;
+      padding:8px 12px;
+    }
+    .basketReviewHeader h2{
+      margin:0;
+      text-align:center;
+      font-size:40px;
+      color:#172f4a;
+      font-weight:900;
+      letter-spacing:.2px;
+    }
+    .basketAudioBtn{
+      width:50px;
+      height:50px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background:#fff;
+      color:#1e5a88;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+    }
+    .basketAudioBtn .material-symbols-outlined{font-size:26px;}
+    .basketItemsRegion{
+      min-height:320px;
+      background:#fff;
+    }
+    .basketItemRow{
+      display:grid;
+      grid-template-columns:56px minmax(0,1fr) auto 44px;
+      gap:12px;
+      align-items:center;
+      padding:12px 14px;
+      border-bottom:1px solid #e5ecf6;
+    }
+    .basketItemIcon{
+      width:46px;
+      height:46px;
+      border-radius:12px;
+      background:#f3f8ff;
+      border:1px solid #d6e2f3;
+      color:#2e7ab8;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .basketItemIcon .material-symbols-outlined{font-size:26px;}
+    .basketItemMeta{
+      min-width:0;
+      display:grid;
+      gap:3px;
+      color:#1c3653;
+    }
+    .basketItemMain{
+      font-size:30px;
+      font-weight:900;
+      line-height:1.12;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .basketItemSub{
+      font-size:18px;
+      color:var(--muted);
+      font-weight:700;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .basketItemPrice{
+      font-size:30px;
+      font-weight:900;
+      color:#1b3452;
+      white-space:nowrap;
+    }
+    .basketRemoveBtn{
+      width:40px;
+      height:40px;
+      border-radius:10px;
+      border:1px solid var(--border);
+      background:#fff;
+      color:#40506b;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+    }
+    .basketRemoveBtn .material-symbols-outlined{font-size:24px;}
+    .basketEmpty{
+      padding:28px 16px;
+      color:var(--muted);
+      font-size:22px;
+      font-weight:700;
+      text-align:center;
+    }
+    .basketTotalStrip{
+      border-top:1px solid var(--border);
+      border-bottom:1px solid var(--border);
+      background:#fbfcff;
+      padding:10px 14px;
+      display:flex;
+      justify-content:flex-end;
+      gap:16px;
+      align-items:center;
+      color:#233954;
+      font-size:22px;
+      font-weight:800;
+    }
+    .basketTotalStrip strong{
+      font-size:36px;
+      color:#14293f;
+      font-weight:900;
+      min-width:120px;
+      text-align:right;
+    }
+    .basketActionBar{
+      padding:10px 14px;
+      display:grid;
+      grid-template-columns:auto 1fr auto;
+      gap:10px;
+      align-items:center;
+      background:#fff;
+    }
+    .basketRightActions{
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .basketActionBar .btn{
+      min-height:58px;
+      font-size:24px;
+      border-radius:12px;
+      padding:12px 18px;
+    }
+    .basketFinishBtn{
+      min-width:200px;
+      justify-content:center;
+    }
+    .basketStepMeta{
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      gap:10px;
+      color:var(--muted);
+      font-size:14px;
+      font-weight:800;
+      text-align:center;
     }
     .tag{
       display:inline-flex;gap:6px;align-items:center;
@@ -731,6 +891,24 @@
       .weightItemVisual{min-height:120px;font-size:56px;}
       .weightActions{grid-template-columns:1fr;}
       .weightActions .btn{font-size:18px;min-height:58px;}
+      .basketReviewHeader{grid-template-columns:50px minmax(0,1fr) 50px;}
+      .basketReviewHeader h2{font-size:28px;}
+      .basketItemsRegion{min-height:220px;}
+      .basketItemRow{
+        grid-template-columns:42px minmax(0,1fr);
+        gap:10px;
+      }
+      .basketItemMain{font-size:20px;}
+      .basketItemSub{font-size:14px;}
+      .basketItemPrice{font-size:24px;grid-column:2;}
+      .basketRemoveBtn{grid-column:2;justify-self:end;margin-top:-44px;}
+      .basketTotalStrip{font-size:18px;}
+      .basketTotalStrip strong{font-size:26px;min-width:auto;}
+      .basketActionBar{grid-template-columns:1fr;gap:8px;}
+      .basketRightActions{justify-content:space-between;}
+      .basketActionBar .btn{font-size:18px;min-height:52px;}
+      .basketFinishBtn{min-width:0;flex:1;}
+      .basketStepMeta{justify-content:flex-start;}
       .grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;}
       .formRow{grid-template-columns:1fr;}
       .flowShell{grid-template-columns:1fr;}
@@ -1804,6 +1982,7 @@ const backBtn = document.getElementById("backBtn");
 const resetBtn = document.getElementById("resetBtn");
 const cancelBtn = document.getElementById("cancelBtn");
 const helpBtn = document.getElementById("helpBtn");
+const bottomBar = document.querySelector(".bottombar");
 
 function stepCount(){ return 6; }
 
@@ -2119,6 +2298,9 @@ function render(){
   applyQuickDemoDefaults();
   setDestinationPill();
   updateProgress();
+  if(bottomBar){
+    bottomBar.style.display = state.step === 5 ? "none" : "flex";
+  }
   const destPill = document.getElementById("destPill");
   if(destPill){
     destPill.style.display = state.step === 0 ? "none" : "inline-flex";
@@ -3443,65 +3625,150 @@ function renderFilterAndPresentOptions(){
 
 function renderBasketAndPay(){
   const service = selectedService();
+  const basePrice = service ? calculateServicePrice(service) : 0;
   const total = basketTotal();
+  const profileLabel = service
+    ? (service.profile === "evri_dpd" ? "EVRi/DPD" : "Royal Mail")
+    : "Not set";
+  const clip = (value, max = 64)=>{
+    const text = String(value || "").trim();
+    if(!text) return "Not set";
+    return text.length > max ? `${text.slice(0, max - 1)}...` : text;
+  };
+  const recipientSnippet = [state.recipientPostcode, state.recipientAddress].filter(Boolean).join(" - ");
+  const senderSnippet = [state.senderPostcode, state.senderAddress].filter(Boolean).join(" - ");
+  const rmRule = currentRMRule();
+  const rmDgSnippet = state.rmOtherSelected
+    ? "RM DG: Other / not listed"
+    : (rmRule ? `RM DG: ${rmRule.label}` : "RM DG: Not set");
+  const podSnippet = state.proofOfDelivery ? "Proof of delivery: Yes (+£1.50)" : "Proof of delivery: No";
+  const itemHeading = service
+    ? `${service.name} • ${state.recipientPostcode || "Postcode not set"} • ${profileLabel}`
+    : "No item currently in basket";
 
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Add to Basket and Pay (KIOSK-417)</h1>
-        <p class="subtitle">Review basket, then take payment and finalise transaction.</p>
+        <h1>Review & Pay (KIOSK-417)</h1>
+        <p class="subtitle">Review the item being processed, then finish to continue.</p>
       </div>
       <span class="pill"><span class="material-symbols-outlined">shopping_cart</span> Basket and pay</span>
     </div>
 
-    <div class="formRow">
-      <div class="card">
-        <h3>Review basket (KIOSK-419)</h3>
+    <div class="basketReviewScreen">
+      <div class="basketReviewHeader">
+        <button type="button" class="basketAudioBtn" id="basketAudioBtn" aria-label="Audio prompt">
+          <span class="material-symbols-outlined">volume_up</span>
+        </button>
+        <h2>Review & Pay</h2>
+        <div></div>
+      </div>
+
+      <div class="basketItemsRegion">
         ${service ? `
-          <div class="helpNote">
-            <strong>Service:</strong> ${escapeHtml(service.name)}<br/>
-            <strong>Base price:</strong> £${calculateServicePrice(service).toFixed(2)}<br/>
-            <strong>Proof of delivery:</strong> ${state.proofOfDelivery ? "Yes (£1.50)" : "No"}<br/>
-            <strong>Total:</strong> £${total.toFixed(2)}
+          <div class="basketItemRow">
+            <div class="basketItemIcon"><span class="material-symbols-outlined">inventory_2</span></div>
+            <div class="basketItemMeta">
+              <div class="basketItemMain">${escapeHtml(itemHeading)}</div>
+              <div class="basketItemSub">To: ${escapeHtml(clip(recipientSnippet, 72))}</div>
+              <div class="basketItemSub">From: ${escapeHtml(clip(senderSnippet, 72))}</div>
+              <div class="basketItemSub">${escapeHtml(podSnippet)} • ${escapeHtml(rmDgSnippet)}</div>
+            </div>
+            <div class="basketItemPrice">£${basePrice.toFixed(2)}</div>
+            <button type="button" class="basketRemoveBtn" id="basketRemoveBtn" aria-label="Remove item">
+              <span class="material-symbols-outlined">delete</span>
+            </button>
           </div>
         ` : `
-          <div class="banner danger show" style="display:block;">No service selected.</div>
+          <div class="basketEmpty">No item has been added. Go back and select a postage product.</div>
         `}
       </div>
-      <div class="card">
-        <h3>Take payment (KIOSK-420)</h3>
-        <div class="choiceRow3" id="paymentChoices">
-          <button type="button" class="choiceBtn ${state.paymentMethod==="card"?"active":""}" data-value="card"><span>Card</span></button>
-          <button type="button" class="choiceBtn ${state.paymentMethod==="applepay"?"active":""}" data-value="applepay"><span>Apple Pay</span></button>
-          <button type="button" class="choiceBtn ${state.paymentMethod==="googlepay"?"active":""}" data-value="googlepay"><span>Google Pay</span></button>
-        </div>
-        <button class="btn primary" id="capturePaymentBtn" style="margin-top:12px;">
-          <span class="material-symbols-outlined">payments</span> Take payment and finalise
+
+      <div class="basketTotalStrip">
+        <span>Total due</span>
+        <strong>£${total.toFixed(2)}</strong>
+      </div>
+
+      <div class="basketActionBar">
+        <button type="button" class="btn danger" id="basketCancelExitBtn">
+          <span class="material-symbols-outlined">close</span>Cancel and exit
         </button>
-        ${state.paymentComplete ? `
-          <div class="banner ok show" style="display:block; margin-top:10px;">Payment captured successfully.</div>
-        ` : ""}
+        <div class="basketStepMeta">
+          <span>Step 5 of 6</span>
+          <span class="wireframeFlag">Journey wireframe only</span>
+        </div>
+        <div class="basketRightActions">
+          <button type="button" class="btn secondary" id="basketHelpBtn">
+            <span class="material-symbols-outlined">help</span>Help
+          </button>
+          <button type="button" class="btn primary basketFinishBtn" id="basketFinishBtn">
+            Finish <span class="material-symbols-outlined">check_circle</span>
+          </button>
+        </div>
       </div>
     </div>
   `;
 
-  document.querySelectorAll("#paymentChoices .choiceBtn").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      state.paymentMethod = btn.dataset.value || "";
-      document.querySelectorAll("#paymentChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
-    });
-  });
+  const audioBtn = document.getElementById("basketAudioBtn");
+  if(audioBtn){
+    audioBtn.addEventListener("click", ()=> alert("Audio prompt – prototype action"));
+  }
 
-  document.getElementById("capturePaymentBtn").addEventListener("click", ()=>{
-    if(!state.paymentMethod){
-      alert("Select a payment method first.");
+  const removeBtn = document.getElementById("basketRemoveBtn");
+  if(removeBtn){
+    removeBtn.addEventListener("click", ()=>{
+      state.selectedServiceId = "";
+      state.productProfile = "royal_mail";
+      state.evriScreeningOpen = false;
+      state.evriAdditionalSelection = "";
+      state.evriSelectedProhibitedKey = null;
+      state.evriAdditionalBlocked = false;
+      state.evriScreeningComplete = false;
+      state.evriLossOnlySelected = false;
+      state.evriNoCompSelected = false;
+      state.coverLossOnlyKeys = new Set();
+      state.coverNoCompKeys = new Set();
+      state.paymentComplete = false;
+      state.transactionRef = "";
+      state.filterFlowStage = "service";
+      navigateToStep(4);
+    });
+  }
+
+  document.getElementById("basketCancelExitBtn").addEventListener("click", ()=> resetAll());
+  document.getElementById("basketHelpBtn").addEventListener("click", ()=> alert("Help – prototype action"));
+  document.getElementById("basketFinishBtn").addEventListener("click", ()=>{
+    if(!service){
+      alert("No item in basket. Select a postage product before finishing.");
+      state.filterFlowStage = "service";
+      navigateToStep(4);
       return;
     }
+    const hasAddresses = !!state.recipientPostcode && !!state.recipientAddress && !!state.senderPostcode && !!state.senderAddress;
+    if(!hasAddresses){
+      alert("Complete recipient and sender address details before finishing.");
+      state.filterFlowStage = "address";
+      navigateToStep(4);
+      return;
+    }
+    if(state.productProfile === "evri_dpd" && (!state.evriScreeningComplete || state.evriAdditionalBlocked)){
+      alert("Complete EVRi/DPD additional screening before finishing.");
+      state.filterFlowStage = "address";
+      navigateToStep(4);
+      return;
+    }
+    if(!rmNIStatus().ok){
+      alert(rmNIStatus().message || "Complete NI/Windsor checks before finishing.");
+      state.filterFlowStage = "address";
+      navigateToStep(4);
+      return;
+    }
+    state.paymentMethod = state.paymentMethod || "card";
     state.paymentComplete = true;
     if(!state.transactionRef){
       state.transactionRef = `TX-${Math.random().toString(36).slice(2,8).toUpperCase()}`;
     }
-    render();
+    next();
   });
 }
 
