@@ -1010,6 +1010,12 @@ const state = {
   niCustomsReference: "",
   niSpsCategory: "",
   niPrivateIndividual: "",
+  niMovementType: "",
+  niContentsDescription: "",
+  niItemCount: "",
+  niTotalDeclaredValue: "",
+  niDeclarationAccurate: false,
+  niDeclarationNoRestricted: false,
   rmNiPerishableRoute: "",
   rmNiPlantCertRef: "",
   proofOfDelivery: false,
@@ -1611,16 +1617,26 @@ function setDestinationPill(){
   destLabel.textContent = state.destination === "uk" ? "UK" : "International";
 }
 
-function applyDestinationSelection(value){
-  state.destination = value || "";
-  state.selectedServiceId = "";
-  state.productProfile = "royal_mail";
+function clearNIMovementInfo(){
   state.niCustomsConfirmed = false;
   state.niCustomsReference = "";
   state.niSpsCategory = "";
   state.niPrivateIndividual = "";
+  state.niMovementType = "";
+  state.niContentsDescription = "";
+  state.niItemCount = "";
+  state.niTotalDeclaredValue = "";
+  state.niDeclarationAccurate = false;
+  state.niDeclarationNoRestricted = false;
   state.rmNiPerishableRoute = "";
   state.rmNiPlantCertRef = "";
+}
+
+function applyDestinationSelection(value){
+  state.destination = value || "";
+  state.selectedServiceId = "";
+  state.productProfile = "royal_mail";
+  clearNIMovementInfo();
   state.rmSelectedKey = null;
   state.rmBlockedKey = null;
   state.rmOtherSelected = false;
@@ -1658,12 +1674,7 @@ function setQuickDemoPreset(mode){
       state.recipientPostcode = "SW1A 1AA";
       state.recipientAddress = "10 Downing Street, London";
     }
-    state.niCustomsConfirmed = false;
-    state.niCustomsReference = "";
-    state.niSpsCategory = "";
-    state.niPrivateIndividual = "";
-    state.rmNiPerishableRoute = "";
-    state.rmNiPlantCertRef = "";
+    clearNIMovementInfo();
   } else {
     if(!isBTPostcode(state.recipientPostcode)){
       state.recipientPostcode = "BT1 5GS";
@@ -1684,8 +1695,7 @@ function isBTPostcode(value){
 function isGBToNIJourney(){
   return state.destination === "uk"
     && isBTPostcode(state.recipientPostcode)
-    && !!state.senderPostcode
-    && !isBTPostcode(state.senderPostcode);
+    && (!state.senderPostcode || !isBTPostcode(state.senderPostcode));
 }
 
 function currentRMRule(){
@@ -1837,6 +1847,48 @@ function numericValue(value){
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function niMovementValidation(){
+  const issues = [];
+  const niRequired = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
+  if(!niRequired) return issues;
+
+  const movementTypes = new Set(["c2c", "b2c", "c2b"]);
+  if(!movementTypes.has(state.niMovementType)){
+    issues.push("Select parcel movement type (C2C, B2C, or C2B).");
+  }
+  if(!(state.niContentsDescription || "").trim()){
+    issues.push("Enter a plain-English parcel contents description.");
+  }
+
+  const itemCount = Number.parseInt((state.niItemCount || "").trim(), 10);
+  if(!Number.isFinite(itemCount) || itemCount <= 0){
+    issues.push("Enter number of items in the parcel.");
+  }
+
+  if(numericValue(state.niTotalDeclaredValue) <= 0){
+    issues.push("Enter total declared value of parcel contents.");
+  }
+
+  if(!(state.niCustomsReference || "").trim()){
+    issues.push("Enter NI movement information reference.");
+  }
+  if(!state.niCustomsConfirmed){
+    issues.push("Confirm NI movement information has been submitted.");
+  }
+  if(!state.niDeclarationAccurate){
+    issues.push("Confirm the information provided is accurate.");
+  }
+  if(!state.niDeclarationNoRestricted){
+    issues.push("Confirm parcel does not contain prohibited or restricted goods.");
+  }
+
+  const niRule = rmNIStatus();
+  if(!niRule.ok){
+    issues.push(niRule.message || "Resolve NI route restrictions.");
+  }
+  return issues;
+}
+
 function isDomesticJourney(){
   return state.destination === "uk";
 }
@@ -1978,12 +2030,7 @@ function applyQuickDemoDefaults(){
     } else if(!state.recipientAddress){
       state.recipientAddress = "10 Downing Street, London";
     }
-    state.niCustomsConfirmed = false;
-    state.niCustomsReference = "";
-    state.niSpsCategory = "";
-    state.niPrivateIndividual = "";
-    state.rmNiPerishableRoute = "";
-    state.rmNiPlantCertRef = "";
+    clearNIMovementInfo();
   }
   if(state.destination === "uk" && isBTPostcode(state.recipientPostcode)){
     if(!state.niCustomsReference) state.niCustomsReference = "NI-EXAMPLE-001";
@@ -1991,6 +2038,12 @@ function applyQuickDemoDefaults(){
     if(!state.niPrivateIndividual) state.niPrivateIndividual = "yes";
     if(!state.rmNiPerishableRoute) state.rmNiPerishableRoute = "confectionery_only";
     if(!state.rmNiPlantCertRef) state.rmNiPlantCertRef = "NI-CERT-001";
+    if(!state.niMovementType) state.niMovementType = "c2c";
+    if(!state.niContentsDescription) state.niContentsDescription = "Books and stationery";
+    if(!state.niItemCount) state.niItemCount = "2";
+    if(!state.niTotalDeclaredValue) state.niTotalDeclaredValue = state.declaredValue || "39.99";
+    state.niDeclarationAccurate = true;
+    state.niDeclarationNoRestricted = true;
     state.niCustomsConfirmed = true;
   }
   state.proofOfDelivery = true;
@@ -2324,7 +2377,7 @@ function updateBreadcrumb(){
     ? deliveryPreferenceLabel(state.deliverySpeed || "")
     : "Skipped (Intl)";
   const niNeeded = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
-  const niStatus = niNeeded ? (state.niCustomsConfirmed ? "Captured" : "Pending") : "N/A";
+  const niStatus = niNeeded ? (niMovementValidation().length ? "Pending" : "Captured") : "N/A";
   const carrierStatus = service && service.profile === "evri_dpd"
     ? (state.evriScreeningComplete ? "Screened" : "Pending")
     : "N/A";
@@ -2337,7 +2390,7 @@ function updateBreadcrumb(){
     { icon:"payments", label:"Value", value },
     { icon:"bolt", label:"Speed", value: speed },
     { icon:"local_shipping", label:"Service", value: service ? service.name : "Not set" },
-    { icon:"location_on", label:"NI/Windsor", value: niStatus },
+    { icon:"location_on", label:"NI movement", value: niStatus },
     { icon:"fact_check", label:"EVRi/DPD", value: carrierStatus }
   ];
   const crumbs = allCrumbs.filter(item =>
@@ -2410,7 +2463,7 @@ function render(){
       nextBtn.innerHTML = needsEvri
         ? `Continue to sender details <span class="material-symbols-outlined">arrow_forward</span>`
         : (niRoute
-          ? `Continue to NI checks <span class="material-symbols-outlined">arrow_forward</span>`
+          ? `Continue to NI movement info <span class="material-symbols-outlined">arrow_forward</span>`
           : `Add to basket <span class="material-symbols-outlined">add_shopping_cart</span>`);
     } else if(stage === "sender"){
       nextBtn.innerHTML = (!state.evriScreeningComplete || state.evriAdditionalBlocked)
@@ -3300,6 +3353,12 @@ function renderEvriAdditionalScreening(){
       return;
     }
     if(state.step === 4 && state.filterFlowStage === "sender"){
+      const recipientIsBT = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
+      if(recipientIsBT){
+        state.filterFlowStage = "ni";
+        render();
+        return;
+      }
       state.basketAdded = true;
       navigateToStep(5);
       return;
@@ -3362,8 +3421,8 @@ function renderFilterAndPresentOptions(){
     ? `EVRi/DPD screening: ${state.evriScreeningComplete ? "complete" : "pending"}${state.evriAdditionalSelection === "blocked" ? ` (blocked by ${evriProhibitedLabel})` : ""}.`
     : "Carrier-specific EVRi/DPD screening not required for current service.";
   const narrativeNI = showNI
-    ? `NI/Windsor checks: ${state.niCustomsConfirmed ? "complete" : "pending"}${state.niCustomsReference ? ` (${state.niCustomsReference})` : ""}.`
-    : "NI/Windsor checks not required for current postcode.";
+    ? `NI movement information: ${niMovementValidation().length ? "pending" : "complete"}${state.niCustomsReference ? ` (${state.niCustomsReference})` : ""}.`
+    : "NI movement information not required for current postcode.";
   const narrativeNIRule = showRMNISpecial && niStatus.message
     ? `NI route rule: ${niStatus.message}`
     : "";
@@ -3374,7 +3433,7 @@ function renderFilterAndPresentOptions(){
     renderFilterAndPresentOptions();
     return;
   }
-  if(stage === "ni" && (needsEvriAdditional || !showNI)){
+  if(stage === "ni" && !showNI){
     state.filterFlowStage = "recipient";
     renderFilterAndPresentOptions();
     return;
@@ -3442,7 +3501,7 @@ function renderFilterAndPresentOptions(){
       : needsEvriAdditional
       ? "Next screen: sender postcode and first line of address."
       : showNI
-      ? "Next screen: NI/Windsor checks."
+      ? "Next screen: NI movement information."
       : "Next screen: basket review.";
 
     screen.innerHTML = `
@@ -3510,12 +3569,7 @@ function renderFilterAndPresentOptions(){
       const nowNI = isBTPostcode(state.recipientPostcode);
       if(prevNI !== nowNI){
         if(!nowNI){
-          state.niCustomsReference = "";
-          state.niCustomsConfirmed = false;
-          state.niSpsCategory = "";
-          state.niPrivateIndividual = "";
-          state.rmNiPerishableRoute = "";
-          state.rmNiPlantCertRef = "";
+          clearNIMovementInfo();
         }
         render();
       }
@@ -3559,7 +3613,9 @@ function renderFilterAndPresentOptions(){
           <div class="flowNarrative">
             <h4>Journey Note</h4>
             <p>EVRi/DPD product selected: sender details are required.</p>
-            <p>Next screen: EVRi/DPD goods/content screening.</p>
+            <p>${state.destination === "uk" && isBTPostcode(state.recipientPostcode)
+              ? "Next screens: EVRi/DPD goods/content screening, then NI movement information."
+              : "Next screen: EVRi/DPD goods/content screening."}</p>
             <p>${state.evriScreeningComplete ? "EVRi/DPD screening currently complete." : "EVRi/DPD screening currently pending."}</p>
           </div>
         </aside>
@@ -3602,13 +3658,14 @@ function renderFilterAndPresentOptions(){
     return;
   }
 
+  const niIssues = niMovementValidation();
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Northern Ireland / Windsor checks (KIOSK-867)</h1>
-        <p class="subtitle">Complete NI checks, then continue to basket.</p>
+        <h1>Northern Ireland movement information (KIOSK-867)</h1>
+        <p class="subtitle">BT postcode detected. Capture NI movement information before basket.</p>
       </div>
-      <span class="pill"><span class="material-symbols-outlined">location_on</span> NI checks</span>
+      <span class="pill"><span class="material-symbols-outlined">location_on</span> NI movement info</span>
     </div>
 
     <div class="flowShell">
@@ -3621,34 +3678,40 @@ function renderFilterAndPresentOptions(){
         </div>
 
         <div class="card">
-          <h3>Northern Ireland / Windsor checks (KIOSK-867)</h3>
-          <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Does parcel include sanitary/phytosanitary goods (e.g. meat, dairy, plants)?</p>
-          <div class="choiceRow" id="niSpsChoices">
-            <button type="button" class="choiceBtn ${state.niSpsCategory==="no"?"active":""}" data-value="no"><span>No</span></button>
-            <button type="button" class="choiceBtn ${state.niSpsCategory==="yes"?"active":""}" data-value="yes"><span>Yes</span></button>
-          </div>
-          <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Is this being sent to a private individual?</p>
-          <div class="choiceRow" id="niPrivateChoices">
-            <button type="button" class="choiceBtn ${state.niPrivateIndividual==="yes"?"active":""}" data-value="yes"><span>Yes</span></button>
-            <button type="button" class="choiceBtn ${state.niPrivateIndividual==="no"?"active":""}" data-value="no"><span>No</span></button>
-          </div>
-          <input id="niReferenceInput" placeholder="NI/Windsor declaration reference" value="${escapeHtml(state.niCustomsReference)}" style="margin-top:8px;" />
-          <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Confirm NI/Windsor information has been captured and validated.</p>
-          <div class="choiceRow" id="niConfirmChoices">
-            <button type="button" class="choiceBtn ${state.niCustomsConfirmed?"active":""}" data-value="yes"><span>Yes, confirmed</span></button>
-            <button type="button" class="choiceBtn ${!state.niCustomsConfirmed?"active":""}" data-value="no"><span>Not yet</span></button>
+          <h3>Northern Ireland movement information (KIOSK-867)</h3>
+          <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Movement type</p>
+          <div class="choiceRow3" id="niMovementTypeChoices">
+            <button type="button" class="choiceBtn ${state.niMovementType==="c2c"?"active":""}" data-value="c2c"><span>C2C</span><span class="sub">Consumer to consumer</span></button>
+            <button type="button" class="choiceBtn ${state.niMovementType==="b2c"?"active":""}" data-value="b2c"><span>B2C</span><span class="sub">Business to consumer</span></button>
+            <button type="button" class="choiceBtn ${state.niMovementType==="c2b"?"active":""}" data-value="c2b"><span>C2B</span><span class="sub">Consumer to business</span></button>
           </div>
 
-          ${showRMNISpecial && selectedRMRule.niRule === "live_creatures_forbidden" ? `
-            <div class="banner danger show" style="display:block; margin-top:10px;">
-              ${escapeHtml(niStatus.message || "This selected Royal Mail category is blocked for Great Britain to Northern Ireland journeys.")}
+          <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Plain-English contents description</p>
+          <input id="niContentsDescriptionInput" placeholder="e.g. Clothing and books" value="${escapeHtml(state.niContentsDescription)}" />
+
+          <div class="formRow" style="margin-top:8px;">
+            <div>
+              <p style="margin:0 0 8px; color:var(--muted); font-size:13px;">Number of items in parcel</p>
+              <input id="niItemCountInput" inputmode="numeric" placeholder="e.g. 2" value="${escapeHtml(state.niItemCount)}" />
             </div>
-          ` : ""}
+            <div>
+              <p style="margin:0 0 8px; color:var(--muted); font-size:13px;">Total declared value (£)</p>
+              <input id="niTotalDeclaredValueInput" inputmode="decimal" placeholder="e.g. 39.99" value="${escapeHtml(state.niTotalDeclaredValue)}" />
+            </div>
+          </div>
 
-          ${showRMNISpecial && selectedRMRule.niRule === "perishable_extra" ? `
-            <h3 style="margin-top:14px;">Additional RM perishable checks</h3>
-            ${state.niSpsCategory === "yes" ? `
-              <div class="choiceGroup" id="rmPerishableRouteChoices" style="margin-top:8px;">
+          <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">NI movement information reference</p>
+          <input id="niReferenceInput" placeholder="e.g. NI-EXAMPLE-001" value="${escapeHtml(state.niCustomsReference)}" />
+
+          ${showRMNISpecial ? `
+            <h3 style="margin-top:14px;">Additional Royal Mail NI checks</h3>
+            <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Does parcel include sanitary/phytosanitary goods (e.g. meat, dairy, plants)?</p>
+            <div class="choiceRow" id="niSpsChoices">
+              <button type="button" class="choiceBtn ${state.niSpsCategory==="no"?"active":""}" data-value="no"><span>No</span></button>
+              <button type="button" class="choiceBtn ${state.niSpsCategory==="yes"?"active":""}" data-value="yes"><span>Yes</span></button>
+            </div>
+            ${showRMNISpecial && selectedRMRule.niRule === "perishable_extra" && state.niSpsCategory === "yes" ? `
+              <div class="choiceGroup" id="rmPerishableRouteChoices" style="margin-top:10px;">
                 <button type="button" class="choiceBtn ${state.rmNiPerishableRoute==="confectionery_only"?"active":""}" data-value="confectionery_only">
                   <span>Confectionery only</span>
                   <span class="sub">No meat/dairy/pet food</span>
@@ -3666,18 +3729,49 @@ function renderFilterAndPresentOptions(){
                 <input id="rmNiPlantCertRefInput" placeholder="Plant/flower certification reference" value="${escapeHtml(state.rmNiPlantCertRef)}" style="margin-top:8px;" />
               ` : ""}
             ` : ""}
-            ${niStatus.message ? `
-              <div class="banner ${niStatus.blocked ? "danger" : "warn"} show" style="display:block; margin-top:10px;">
-                ${escapeHtml(niStatus.message)}
-              </div>
-            ` : ""}
+          ` : ""}
+
+          <h3 style="margin-top:14px;">Customer declaration</h3>
+          <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">I confirm the information provided is accurate.</p>
+          <div class="choiceRow" id="niAccuracyChoices">
+            <button type="button" class="choiceBtn ${state.niDeclarationAccurate ? "active" : ""}" data-value="yes"><span>Yes</span></button>
+            <button type="button" class="choiceBtn ${!state.niDeclarationAccurate ? "active" : ""}" data-value="no"><span>No</span></button>
+          </div>
+          <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">I confirm this parcel does not contain prohibited or restricted goods.</p>
+          <div class="choiceRow" id="niGoodsChoices">
+            <button type="button" class="choiceBtn ${state.niDeclarationNoRestricted ? "active" : ""}" data-value="yes"><span>Yes</span></button>
+            <button type="button" class="choiceBtn ${!state.niDeclarationNoRestricted ? "active" : ""}" data-value="no"><span>No</span></button>
+          </div>
+          <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Confirm NI movement information submission.</p>
+          <div class="choiceRow" id="niConfirmChoices">
+            <button type="button" class="choiceBtn ${state.niCustomsConfirmed?"active":""}" data-value="yes"><span>Yes, confirmed</span></button>
+            <button type="button" class="choiceBtn ${!state.niCustomsConfirmed?"active":""}" data-value="no"><span>Not yet</span></button>
+          </div>
+
+          ${niIssues.length ? `
+            <div class="banner warn show" style="display:block; margin-top:10px;">
+              <strong>Complete before continuing:</strong>
+              <ul style="margin:8px 0 0 18px; padding:0;">
+                ${niIssues.map(issue => `<li>${escapeHtml(issue)}</li>`).join("")}
+              </ul>
+            </div>
+          ` : `
+            <div class="banner ok show" style="display:block; margin-top:10px;">
+              NI movement information complete.
+            </div>
+          `}
+
+          ${showRMNISpecial && niStatus.message ? `
+            <div class="banner ${niStatus.blocked ? "danger" : "warn"} show" style="display:block; margin-top:10px;">
+              ${escapeHtml(niStatus.message)}
+            </div>
           ` : ""}
         </div>
       </div>
       <aside class="flowAside">
         <div class="flowNarrative">
           <h4>Journey Note</h4>
-          <p>RM item to BT postcode: NI/Windsor checks are required before basket.</p>
+          <p>BT postcode detected: NI movement information is mandatory before basket.</p>
           <p>${escapeHtml(narrativeNI)}</p>
           ${narrativeNIRule ? `<p>${escapeHtml(narrativeNIRule)}</p>` : ""}
         </div>
@@ -3685,11 +3779,70 @@ function renderFilterAndPresentOptions(){
     </div>
   `;
 
+  const niContentsDescriptionInput = document.getElementById("niContentsDescriptionInput");
+  const niItemCountInput = document.getElementById("niItemCountInput");
+  const niTotalDeclaredValueInput = document.getElementById("niTotalDeclaredValueInput");
   const niRef = document.getElementById("niReferenceInput");
-  bindKioskKeyboard(niRef, { title:"Enter NI/Windsor reference", maxLen:40, uppercase:true });
-  if(niRef){
-    niRef.addEventListener("input", (e)=>{ state.niCustomsReference = (e.target.value || "").slice(0, 40); e.target.value = state.niCustomsReference; });
+  bindKioskKeyboard(niContentsDescriptionInput, { title:"Enter NI parcel contents description", maxLen:120, uppercase:false });
+  bindKioskKeyboard(niItemCountInput, { title:"Enter NI parcel item count", maxLen:4, uppercase:false });
+  bindKioskKeyboard(niTotalDeclaredValueInput, { title:"Enter NI total declared value", maxLen:10, uppercase:false });
+  bindKioskKeyboard(niRef, { title:"Enter NI movement reference", maxLen:40, uppercase:true });
+
+  if(niContentsDescriptionInput){
+    niContentsDescriptionInput.addEventListener("input", (e)=>{
+      state.niContentsDescription = (e.target.value || "").slice(0, 120);
+      e.target.value = state.niContentsDescription;
+    });
   }
+  if(niItemCountInput){
+    niItemCountInput.addEventListener("input", (e)=>{
+      const raw = (e.target.value || "").replace(/\D/g, "");
+      state.niItemCount = raw.slice(0, 4);
+      e.target.value = state.niItemCount;
+    });
+  }
+  if(niTotalDeclaredValueInput){
+    niTotalDeclaredValueInput.addEventListener("input", (e)=>{
+      let raw = (e.target.value || "").replace(/[^0-9.]/g, "");
+      const firstDot = raw.indexOf(".");
+      if(firstDot !== -1){
+        raw = raw.slice(0, firstDot + 1) + raw.slice(firstDot + 1).replace(/\./g, "");
+      }
+      state.niTotalDeclaredValue = raw.slice(0, 10);
+      e.target.value = state.niTotalDeclaredValue;
+    });
+  }
+  if(niRef){
+    niRef.addEventListener("input", (e)=>{
+      state.niCustomsReference = (e.target.value || "").toUpperCase().slice(0, 40);
+      e.target.value = state.niCustomsReference;
+    });
+  }
+
+  const niMovementTypeChoices = document.querySelectorAll("#niMovementTypeChoices .choiceBtn");
+  niMovementTypeChoices.forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.niMovementType = btn.dataset.value || "";
+      niMovementTypeChoices.forEach(b=>b.classList.toggle("active", b===btn));
+    });
+  });
+
+  const niAccuracyChoices = document.querySelectorAll("#niAccuracyChoices .choiceBtn");
+  niAccuracyChoices.forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.niDeclarationAccurate = (btn.dataset.value || "") === "yes";
+      niAccuracyChoices.forEach(b=>b.classList.toggle("active", b===btn));
+    });
+  });
+
+  const niGoodsChoices = document.querySelectorAll("#niGoodsChoices .choiceBtn");
+  niGoodsChoices.forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.niDeclarationNoRestricted = (btn.dataset.value || "") === "yes";
+      niGoodsChoices.forEach(b=>b.classList.toggle("active", b===btn));
+    });
+  });
+
   const niConfirmChoices = document.querySelectorAll("#niConfirmChoices .choiceBtn");
   niConfirmChoices.forEach(btn=>{
     btn.addEventListener("click", ()=>{
@@ -3697,6 +3850,7 @@ function renderFilterAndPresentOptions(){
       niConfirmChoices.forEach(b=>b.classList.toggle("active", b===btn));
     });
   });
+
   const niSpsChoices = document.querySelectorAll("#niSpsChoices .choiceBtn");
   niSpsChoices.forEach(btn=>{
     btn.addEventListener("click", ()=>{
@@ -3705,15 +3859,7 @@ function renderFilterAndPresentOptions(){
         state.rmNiPerishableRoute = "";
         state.rmNiPlantCertRef = "";
       }
-      niSpsChoices.forEach(b=>b.classList.toggle("active", b===btn));
       render();
-    });
-  });
-  const niPrivateChoices = document.querySelectorAll("#niPrivateChoices .choiceBtn");
-  niPrivateChoices.forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      state.niPrivateIndividual = btn.dataset.value || "";
-      niPrivateChoices.forEach(b=>b.classList.toggle("active", b===btn));
     });
   });
 
@@ -3729,10 +3875,10 @@ function renderFilterAndPresentOptions(){
   });
 
   const rmNiPlantCertRefInput = document.getElementById("rmNiPlantCertRefInput");
-  bindKioskKeyboard(rmNiPlantCertRefInput, { title:"Enter plant/flower certificate reference", maxLen:40, uppercase:true });
+  bindKioskKeyboard(rmNiPlantCertRefInput, { title:"Enter plant/flower certification reference", maxLen:40, uppercase:true });
   if(rmNiPlantCertRefInput){
     rmNiPlantCertRefInput.addEventListener("input", (e)=>{
-      state.rmNiPlantCertRef = (e.target.value || "").slice(0, 40);
+      state.rmNiPlantCertRef = (e.target.value || "").toUpperCase().slice(0, 40);
       e.target.value = state.rmNiPlantCertRef;
     });
   }
@@ -3902,17 +4048,17 @@ function renderBasketAndPay(){
         return;
       }
     }
-    if(state.productProfile === "royal_mail" && isBTPostcode(state.recipientPostcode)){
-      const niReady = !!state.niCustomsReference && !!state.niSpsCategory && !!state.niPrivateIndividual && state.niCustomsConfirmed;
-      if(!niReady){
-        alert("Complete NI/Windsor checks before finishing.");
+    if(state.destination === "uk" && isBTPostcode(state.recipientPostcode)){
+      const niIssues = niMovementValidation();
+      if(niIssues.length){
+        alert(niIssues[0]);
         state.filterFlowStage = "ni";
         navigateToStep(4);
         return;
       }
     }
     if(!rmNIStatus().ok){
-      alert(rmNIStatus().message || "Complete NI/Windsor checks before finishing.");
+      alert(rmNIStatus().message || "Complete Northern Ireland movement information before finishing.");
       state.filterFlowStage = "ni";
       navigateToStep(4);
       return;
@@ -4190,9 +4336,7 @@ function canContinue(){
       return !!state.selectedServiceId && !!state.senderPostcode && !!state.senderAddress;
     }
     if(stage === "ni"){
-      const niOk = !!state.niCustomsReference && !!state.niSpsCategory && !!state.niPrivateIndividual && state.niCustomsConfirmed;
-      if(!niOk) return false;
-      return rmNIStatus().ok;
+      return niMovementValidation().length === 0;
     }
     if(needsEvri && state.evriScreeningOpen) return false;
     return false;
@@ -4249,12 +4393,12 @@ function next(){
         return;
       }
       if(stage === "ni"){
-        const niStatus = rmNIStatus();
-        if(!niStatus.ok){
-          alert(niStatus.message || "Complete Northern Ireland checks before continuing.");
+        const niIssues = niMovementValidation();
+        if(niIssues.length){
+          alert(niIssues[0]);
           return;
         }
-        alert("Complete NI/Windsor declaration details before continuing.");
+        alert("Complete Northern Ireland movement information before continuing.");
         return;
       }
       if(state.evriScreeningOpen){
@@ -4314,14 +4458,19 @@ function next(){
           return;
         }
       }
+      if(recipientIsBT){
+        state.filterFlowStage = "ni";
+        render();
+        return;
+      }
       state.basketAdded = true;
       navigateToStep(5);
       return;
     }
     if(stage === "ni"){
-      const niStatus = rmNIStatus();
-      if(!niStatus.ok){
-        alert(niStatus.message || "Complete Northern Ireland checks before continuing.");
+      const niIssues = niMovementValidation();
+      if(niIssues.length){
+        alert(niIssues[0]);
         return;
       }
       state.basketAdded = true;
@@ -4341,7 +4490,14 @@ function back(){
       return;
     }
     const stage = state.filterFlowStage || "service";
-    if(stage === "ni" || stage === "sender"){
+    if(stage === "ni"){
+      const service = selectedService();
+      const needsEvri = !!(service && service.profile === "evri_dpd");
+      state.filterFlowStage = needsEvri ? "sender" : "recipient";
+      render();
+      return;
+    }
+    if(stage === "sender"){
       state.filterFlowStage = "recipient";
       render();
       return;
@@ -4393,6 +4549,12 @@ function resetAll(){
   state.niCustomsReference = "";
   state.niSpsCategory = "";
   state.niPrivateIndividual = "";
+  state.niMovementType = "";
+  state.niContentsDescription = "";
+  state.niItemCount = "";
+  state.niTotalDeclaredValue = "";
+  state.niDeclarationAccurate = false;
+  state.niDeclarationNoRestricted = false;
   state.rmNiPerishableRoute = "";
   state.rmNiPlantCertRef = "";
   state.proofOfDelivery = false;
