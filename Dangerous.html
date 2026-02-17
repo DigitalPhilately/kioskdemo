@@ -3380,80 +3380,239 @@ function renderEvriAdditionalScreening(){
   const chosenService = selectedService();
   const contentsCategories = multicarrierContentsCategories();
   const selectedContents = selectedContentsCategory();
-  const compensationCheck = (chosenService && selectedContents)
-    ? runMulticarrierCompensationCheck()
-    : {
-      applies: !!(chosenService && chosenService.profile === "evri_dpd"),
-      eligible: true,
-      outcome: selectedContents ? "covered" : "missing_category",
-      warningShown: false,
-      reason: ""
-    };
-  const compensationWarning = !!compensationCheck.warningShown;
   const backLabel = state.filterFlowStage === "sender" ? "Back to sender details" : "Back to service selection";
+
+  function firstAvailableContentsKey(){
+    const preferred = contentsCategories.find(item => item.key === "general_goods");
+    if(preferred) return preferred.key;
+    return contentsCategories.length ? contentsCategories[0].key : "";
+  }
+
+  function setContentsByKey(key){
+    const category = contentsCategories.find(item => item.key === key) || null;
+    state.contentsCategoryKey = category ? category.key : "";
+    state.contentDescription = category ? category.label : "";
+  }
+
+  function ensureContentsByPreference(preferredKey){
+    const preferred = contentsCategories.find(item => item.key === preferredKey);
+    if(preferred){
+      setContentsByKey(preferred.key);
+      return;
+    }
+    const fallback = firstAvailableContentsKey();
+    if(fallback){
+      setContentsByKey(fallback);
+    }
+  }
+
+  function clearCompensationFlags(){
+    state.coverLossOnlyKeys = new Set();
+    state.coverNoCompKeys = new Set();
+    state.evriLossOnlySelected = false;
+    state.evriNoCompSelected = false;
+    state.evriCompPicker = "";
+  }
+
+  function mapProhibitedToContentsKey(key){
+    const map = {
+      food_all: "perishables",
+      perishables: "perishables",
+      animals: "perishables",
+      money_docs: "valuables",
+      illegal: "valuables",
+      weapons: "irreplaceable_items",
+      vehicle_parts_large: "irreplaceable_items",
+      batteries: "electronics_high_value",
+      medical_equipment: "electronics_high_value"
+    };
+    return map[key] || "general_goods";
+  }
+
+  function mapLossOnlyToContentsKey(key){
+    const map = {
+      antiques: "artwork_collectibles",
+      wall_decor: "artwork_collectibles",
+      electrical_appliances: "electronics_high_value",
+      coffee_machines: "electronics_high_value",
+      telescopes: "electronics_high_value",
+      musical_instruments: "artwork_collectibles",
+      cycles: "irreplaceable_items",
+      models_kits: "artwork_collectibles"
+    };
+    return map[key] || "irreplaceable_items";
+  }
+
+  function mapNoCompToContentsKey(key){
+    const map = {
+      ceramics_stone: "fragile_glass",
+      glass: "fragile_glass",
+      precious_metals: "valuables",
+      watches: "valuables",
+      small_vehicle_parts: "irreplaceable_items",
+      packaging: "irreplaceable_items"
+    };
+    return map[key] || "irreplaceable_items";
+  }
+
   const prohibitedGroups = EVRI_PROHIBITED_GROUPS.map(group => ({
     ...group,
     items: group.itemKeys
       .map(key => PROHIBITED.find(item => item.key === key))
       .filter(Boolean)
   }));
-  const selectedGroup = prohibitedGroups.find(group => group.key === state.evriProhibitedGroupKey) || null;
+
+  const tileBase = [
+    {
+      key: "evri_contents",
+      mode: "contents",
+      icon: "category",
+      label: "Declared contents",
+      prompt: "Choose the best-matching contents category for KIOSK-408 / KIOSK-795."
+    },
+    ...prohibitedGroups.map(group => ({
+      key: `evri_prohibited_${group.key}`,
+      mode: "prohibited_group",
+      icon: (group.items[0] && group.items[0].icon) ? group.items[0].icon : "report",
+      label: group.label,
+      prompt: group.prompt || "Select the exact prohibited item category.",
+      groupKey: group.key
+    })),
+    {
+      key: "evri_loss_only",
+      mode: "loss_only",
+      icon: "shield",
+      label: "Loss-only items",
+      prompt: "Select the matching loss-only category."
+    },
+    {
+      key: "evri_no_comp",
+      mode: "no_comp",
+      icon: "gpp_bad",
+      label: "No-comp items",
+      prompt: "Select the matching no-compensation category."
+    }
+  ];
+  const otherTile = {
+    key: "evri_other",
+    mode: "other",
+    icon: "check_circle",
+    label: "Other / not listed",
+    prompt: "Use this when the item does not match any listed category."
+  };
+  const gridTiles = [...tileBase];
+  const activeSlots = Math.ceil((gridTiles.length + 1) / 5) * 5;
+  while(gridTiles.length < activeSlots - 1){
+    gridTiles.push({ key: `_evri_gap_${gridTiles.length}`, label: "", icon: "block", details: "", blank: true });
+  }
+  gridTiles.push(otherTile);
+
+  let activeTileKey = "";
+  if(state.evriAdditionalSelection === "blocked" && state.evriSelectedProhibitedKey){
+    const selectedGroup = EVRI_PROHIBITED_GROUPS.find(group => group.itemKeys.includes(state.evriSelectedProhibitedKey));
+    if(selectedGroup){
+      activeTileKey = `evri_prohibited_${selectedGroup.key}`;
+    }
+  } else if(state.coverNoCompKeys.size){
+    activeTileKey = "evri_no_comp";
+  } else if(state.coverLossOnlyKeys.size){
+    activeTileKey = "evri_loss_only";
+  } else if(state.contentsCategoryKey){
+    activeTileKey = "evri_contents";
+  } else if(state.evriAdditionalSelection === "clear"){
+    activeTileKey = "evri_other";
+  }
+
   const selectedProhibitedItem = PROHIBITED.find(item => item.key === state.evriSelectedProhibitedKey) || null;
-  const lossLabels = [...state.coverLossOnlyKeys]
-    .map(key => LOSS_ONLY.find(item => item.key === key)?.label)
-    .filter(Boolean);
-  const noCompLabels = [...state.coverNoCompKeys]
-    .map(key => NO_COMP.find(item => item.key === key)?.label)
-    .filter(Boolean);
-  const showLossPicker = state.evriCompPicker === "loss" || state.coverLossOnlyKeys.size > 0;
-  const showNoCompPicker = state.evriCompPicker === "no_comp" || state.coverNoCompKeys.size > 0;
-  const prohibitedBanner = state.evriAdditionalSelection === "blocked"
-    ? `<div class="banner danger show" style="display:block; margin-top:10px;">Prohibited item selected: ${escapeHtml(selectedProhibitedItem ? selectedProhibitedItem.label : "Category selected")}.</div>`
-    : state.evriAdditionalSelection === "clear"
-    ? `<div class="banner ok show" style="display:block; margin-top:10px;">No prohibited item selected (Other / not listed).</div>`
-    : `<div class="banner warn show" style="display:block; margin-top:10px;">Select a prohibited outcome before confirming screening.</div>`;
+  const selectedLossItem = [...state.coverLossOnlyKeys]
+    .map(key => LOSS_ONLY.find(item => item.key === key))
+    .find(Boolean) || null;
+  const selectedNoCompItem = [...state.coverNoCompKeys]
+    .map(key => NO_COMP.find(item => item.key === key))
+    .find(Boolean) || null;
+
+  const compensationCheck = (chosenService && state.contentsCategoryKey)
+    ? runMulticarrierCompensationCheck()
+    : {
+      applies: !!(chosenService && chosenService.profile === "evri_dpd"),
+      eligible: true,
+      outcome: state.contentsCategoryKey ? "covered" : "missing_category",
+      warningShown: false,
+      reason: ""
+    };
+  const compensationWarning = !!compensationCheck.warningShown && !state.evriAdditionalBlocked;
+
+  let outcomeClass = "warn";
+  let outcomeTitle = "Select item category";
+  let outcomeText = "Choose one icon, then confirm the exact item in the follow-up menu.";
+
+  if(state.evriAdditionalSelection === "blocked"){
+    outcomeClass = "danger";
+    outcomeTitle = "Prohibited item selected";
+    outcomeText = selectedProhibitedItem
+      ? `${selectedProhibitedItem.label} cannot be accepted on EVRi/DPD services.`
+      : "Selected item cannot be accepted on EVRi/DPD services.";
+  } else if(selectedNoCompItem){
+    outcomeClass = "danger";
+    outcomeTitle = "No-compensation category";
+    outcomeText = `${selectedNoCompItem.label}: item can be carried on a no-compensation basis.`;
+  } else if(selectedLossItem){
+    outcomeClass = "warn";
+    outcomeTitle = "Loss-only category";
+    outcomeText = `${selectedLossItem.label}: damage is not protected; loss-only handling applies.`;
+  } else if(state.evriAdditionalSelection === "clear" && state.contentsCategoryKey){
+    if(compensationWarning){
+      outcomeClass = "danger";
+      outcomeTitle = "KIOSK-795 warning";
+      outcomeText = compensationCheck.reason || "Selected contents category is not covered for compensation on this service.";
+    } else {
+      outcomeClass = "ok";
+      outcomeTitle = "Screening clear";
+      outcomeText = selectedContents
+        ? `${selectedContents.label} selected. No prohibited category matched.`
+        : "No prohibited category matched.";
+    }
+  }
 
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>EVRi/DPD additional screening</h1>
-        <p class="subtitle">Reduced first-pass view: choose group first, then specific category only when needed.</p>
+        <h1>EVRi/DPD additional screening (KIOSK-408 / KIOSK-411 / KIOSK-795)</h1>
+        <p class="subtitle"><strong>Does your item match any of the following?</strong> Select one icon, then confirm the exact item.</p>
       </div>
       <span class="pill"><span class="material-symbols-outlined">policy</span> Additional carrier checks</span>
     </div>
 
     <div class="flowShell">
       <div class="flowMain">
-        <div class="card">
-          <h3>0) Declare contents category (KIOSK-408)</h3>
-          <p>Select the best-matching contents category before carrier-policy checks.</p>
-          ${contentsCategories.length ? `
-            <div class="choiceGroup" id="evriContentsCategoryChoices">
-              ${contentsCategories.map(category => `
-                <button type="button" class="choiceBtn ${state.contentsCategoryKey===category.key?"active":""}" data-category-key="${escapeHtml(category.key)}">
-                  <span>${escapeHtml(category.label)}</span>
-                  <span class="sub">${escapeHtml(category.description || "Select category")}</span>
-                </button>
-              `).join("")}
+        <div class="gridWrap">
+          <div class="grid" id="evriGrid"></div>
+
+          <div class="details" id="evriDetails">
+            <div class="detailsTop">
+              <div class="detailsTitle" id="evriDetailsTitle"></div>
+              <button class="btn" id="evriDetailsClose"><span class="material-symbols-outlined">close</span>Close</button>
             </div>
-          ` : `
-            <div class="banner danger show" style="display:block;">Contents categories are missing from reference data.</div>
-          `}
-          ${!state.contentsCategoryKey ? `
-            <div class="banner warn show" style="display:block; margin-top:10px;">
-              Select contents category to continue.
-            </div>
-          ` : compensationWarning ? `
-            <div class="banner danger show" style="display:block; margin-top:10px;">
-              <strong>KIOSK-795: Not covered by compensation.</strong><br/>
-              ${escapeHtml(compensationCheck.reason || "The selected contents category is not covered by compensation for this multicarrier service.")}<br/><br/>
-              If this parcel is lost or damaged on this service, compensation will not be payable.
-            </div>
-          ` : `
-            <div class="banner ok show" style="display:block; margin-top:10px;">
-              KIOSK-795: Category is covered (no compensation exclusion warning).
-            </div>
-          `}
+            <div class="detailsText" id="evriDetailsText"></div>
+            <div id="evriDetailsInputs"></div>
+            <div class="banner" id="evriDetailsBanner"></div>
+            <div class="rmConditionActions" id="evriDetailsActions"></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <div class="banner ${outcomeClass} show" style="display:block;">
+            <strong>${escapeHtml(outcomeTitle)}</strong><br/>
+            ${escapeHtml(outcomeText)}
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+            <span class="tag"><span class="material-symbols-outlined">report</span>${escapeHtml(state.evriAdditionalSelection === "blocked" ? `Prohibited: ${selectedProhibitedItem ? selectedProhibitedItem.label : "Selected"}` : "Prohibited: Other / not listed")}</span>
+            <span class="tag"><span class="material-symbols-outlined">category</span>Contents: ${escapeHtml(selectedContents ? selectedContents.label : "Not selected")}</span>
+            <span class="tag"><span class="material-symbols-outlined">gpp_maybe</span>K795: ${escapeHtml(compensationWarning ? (state.multicarrierCompAcknowledged ? "Not covered (ack)" : "Not covered (pending ack)") : (selectedContents ? "Covered" : "Pending"))}</span>
+            <span class="tag"><span class="material-symbols-outlined">package_2</span>Loss-only: ${state.coverLossOnlyKeys.size ? "Yes" : "No"}</span>
+            <span class="tag"><span class="material-symbols-outlined">gpp_bad</span>No-comp: ${state.coverNoCompKeys.size ? "Yes" : "No"}</span>
+          </div>
+
           ${compensationWarning ? `
             <div class="choiceRow" style="margin-top:10px;" id="evriCompAckChoices">
               <button type="button" class="choiceBtn ${state.multicarrierCompAcknowledged ? "active" : ""}" data-value="yes">
@@ -3467,100 +3626,7 @@ function renderEvriAdditionalScreening(){
               <span class="material-symbols-outlined">swap_horiz</span>Choose different service
             </button>
           ` : ""}
-        </div>
 
-        <div class="card">
-          <h3>1) Prohibited check (required)</h3>
-          <p>Select prohibited group, then exact category to apply KIOSK-411 policy blocking.</p>
-          <div class="choiceGroup" id="evriProhibitedGroupChoices">
-            ${prohibitedGroups.map(group => `
-              <button type="button" class="choiceBtn ${state.evriProhibitedGroupKey===group.key ? "active" : ""}" data-group-key="${escapeHtml(group.key)}">
-                <span>${escapeHtml(group.label)}</span>
-                <span class="sub">Open options</span>
-              </button>
-            `).join("")}
-          </div>
-          <div class="choiceRow" style="margin-top:10px;">
-            <button type="button" class="choiceBtn ${state.evriAdditionalSelection==="clear" ? "active" : ""}" id="evriOtherNotListedBtn">
-              <span>Other / not listed</span>
-            </button>
-          </div>
-
-          ${selectedGroup ? `
-            <h3 style="margin-top:14px;">Tell us what is inside</h3>
-            <p style="margin:0 0 10px; color:var(--muted); font-size:13px;">${escapeHtml(selectedGroup.prompt || "Select the exact prohibited item.")}</p>
-            <div class="choiceGroup" id="evriProhibitedItemChoices">
-              ${selectedGroup.items.map(item => `
-                <button type="button" class="choiceBtn ${state.evriSelectedProhibitedKey===item.key ? "active" : ""}" data-item-key="${escapeHtml(item.key)}">
-                  <span>${escapeHtml(item.label)}</span>
-                </button>
-              `).join("")}
-            </div>
-            ${selectedProhibitedItem ? `
-              <div class="helpNote" style="margin-top:10px;">${escapeHtml(selectedProhibitedItem.details)}</div>
-            ` : ""}
-          ` : ""}
-
-          ${prohibitedBanner}
-        </div>
-
-        <div class="card" style="margin-top:14px;">
-          <h3>2) Compensation flags (optional)</h3>
-          <p>Only open these lists if the item is in a listed compensation category.</p>
-
-          <h3 style="margin-top:10px;">Loss-only categories</h3>
-          <div class="choiceRow">
-            <button type="button" class="choiceBtn ${!state.coverLossOnlyKeys.size ? "active" : ""}" id="evriLossNoneBtn">
-              <span>No loss-only categories</span>
-            </button>
-            <button type="button" class="choiceBtn ${showLossPicker ? "active" : ""}" id="evriLossSelectBtn">
-              <span>Select loss-only categories</span>
-            </button>
-          </div>
-          ${showLossPicker ? `
-            <div class="choiceGroup" id="evriLossChoices" style="margin-top:10px;">
-              ${LOSS_ONLY.map(item => `
-                <button type="button" class="choiceBtn ${state.coverLossOnlyKeys.has(item.key) ? "active" : ""}" data-loss-key="${escapeHtml(item.key)}">
-                  <span>${escapeHtml(item.label)}</span>
-                </button>
-              `).join("")}
-            </div>
-          ` : ""}
-          ${lossLabels.length ? `
-            <div class="helpNote" style="margin-top:10px;">Loss-only selected: ${escapeHtml(lossLabels.join(", "))}</div>
-          ` : ""}
-
-          <h3 style="margin-top:14px;">No-compensation categories</h3>
-          <div class="choiceRow">
-            <button type="button" class="choiceBtn ${!state.coverNoCompKeys.size ? "active" : ""}" id="evriNoCompNoneBtn">
-              <span>No no-comp categories</span>
-            </button>
-            <button type="button" class="choiceBtn ${showNoCompPicker ? "active" : ""}" id="evriNoCompSelectBtn">
-              <span>Select no-comp categories</span>
-            </button>
-          </div>
-          ${showNoCompPicker ? `
-            <div class="choiceGroup" id="evriNoCompChoices" style="margin-top:10px;">
-              ${NO_COMP.map(item => `
-                <button type="button" class="choiceBtn ${state.coverNoCompKeys.has(item.key) ? "active" : ""}" data-nocomp-key="${escapeHtml(item.key)}">
-                  <span>${escapeHtml(item.label)}</span>
-                </button>
-              `).join("")}
-            </div>
-          ` : ""}
-          ${noCompLabels.length ? `
-            <div class="helpNote" style="margin-top:10px;">No-comp selected: ${escapeHtml(noCompLabels.join(", "))}</div>
-          ` : ""}
-        </div>
-
-        <div class="card" style="margin-top:14px;">
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <span class="tag"><span class="material-symbols-outlined">report</span>${escapeHtml(state.evriAdditionalSelection === "blocked" ? `Prohibited: ${selectedProhibitedItem ? selectedProhibitedItem.label : "Selected"}` : "Prohibited: Other / not listed")}</span>
-            <span class="tag"><span class="material-symbols-outlined">category</span>Contents: ${escapeHtml(selectedContents ? selectedContents.label : "Not selected")}</span>
-            <span class="tag"><span class="material-symbols-outlined">gpp_maybe</span>K795: ${escapeHtml(compensationWarning ? (state.multicarrierCompAcknowledged ? "Not covered (ack)" : "Not covered (pending ack)") : (selectedContents ? "Covered" : "Pending"))}</span>
-            <span class="tag"><span class="material-symbols-outlined">package_2</span>Loss-only: ${state.coverLossOnlyKeys.size ? "Yes" : "No"}</span>
-            <span class="tag"><span class="material-symbols-outlined">gpp_bad</span>No-comp: ${state.coverNoCompKeys.size ? "Yes" : "No"}</span>
-          </div>
           <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
             <button class="btn" id="evriScreeningBack"><span class="material-symbols-outlined">arrow_back</span>${escapeHtml(backLabel)}</button>
             <button class="btn primary" id="evriScreeningConfirm"><span class="material-symbols-outlined">task_alt</span>Confirm EVRi/DPD screening</button>
@@ -3570,25 +3636,241 @@ function renderEvriAdditionalScreening(){
       <aside class="flowAside">
         <div class="flowNarrative">
           <h4>Journey Note</h4>
-          <p>Step 0 (KIOSK-408): declare contents category.</p>
-          <p>Step 1 (KIOSK-411): block prohibited categories.</p>
-          <p>Step 2 (KIOSK-795): if not covered, customer must acknowledge warning.</p>
-          <p>Loss-only/no-comp flags are optional and only open when needed.</p>
+          <p>Single-screen flow: select icon, choose exact item, then apply outcome.</p>
+          <p>KIOSK-408 contents declaration, KIOSK-411 prohibited filtering, and KIOSK-795 compensation warning are merged.</p>
+          <p>If not covered, customer acknowledgement is required before continuing.</p>
         </div>
       </aside>
     </div>
   `;
 
-  document.querySelectorAll("#evriContentsCategoryChoices .choiceBtn[data-category-key]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      const nextCategory = btn.dataset.categoryKey || "";
-      state.contentsCategoryKey = nextCategory;
-      const category = selectedContentsCategory();
-      state.contentDescription = category ? category.label : "";
+  const grid = document.getElementById("evriGrid");
+  gridTiles.forEach(item => grid.appendChild(tileEl(item, "evri")));
+  if(activeTileKey){
+    const selected = document.querySelector(`.tile[data-mode="evri"][data-key="${activeTileKey}"]`);
+    if(selected) selected.classList.add("selected");
+  }
+
+  const details = document.getElementById("evriDetails");
+  const detailsTitle = document.getElementById("evriDetailsTitle");
+  const detailsText = document.getElementById("evriDetailsText");
+  const detailsInputs = document.getElementById("evriDetailsInputs");
+  const detailsBanner = document.getElementById("evriDetailsBanner");
+  const detailsActions = document.getElementById("evriDetailsActions");
+  const detailsClose = document.getElementById("evriDetailsClose");
+
+  function closeDetails(){
+    details.classList.remove("show");
+    detailsText.textContent = "";
+    detailsInputs.innerHTML = "";
+    detailsActions.innerHTML = "";
+    detailsBanner.className = "banner";
+  }
+
+  function applySelection(type, key, groupKey = ""){
+    if(type === "other"){
+      state.evriSelectedProhibitedKey = null;
+      state.evriProhibitedGroupKey = "";
+      state.evriAdditionalSelection = "clear";
+      state.evriAdditionalBlocked = false;
+      clearCompensationFlags();
+      if(!state.contentsCategoryKey){
+        const fallback = firstAvailableContentsKey();
+        if(fallback){
+          setContentsByKey(fallback);
+        }
+      }
+      resetMulticarrierCompensationState();
+      if(state.contentsCategoryKey){
+        runMulticarrierCompensationCheck({ force:true });
+      }
+      state.evriScreeningComplete = false;
+      render();
+      return;
+    }
+
+    if(type === "contents_category"){
+      const category = contentsCategories.find(item => item.key === key);
+      if(!category) return;
+      setContentsByKey(category.key);
+      state.evriSelectedProhibitedKey = null;
+      state.evriProhibitedGroupKey = "";
+      state.evriAdditionalSelection = "clear";
+      state.evriAdditionalBlocked = false;
+      clearCompensationFlags();
+      resetMulticarrierCompensationState();
+      runMulticarrierCompensationCheck({ force:true });
+      state.evriScreeningComplete = false;
+      render();
+      return;
+    }
+
+    if(type === "prohibited_item"){
+      const item = PROHIBITED.find(entry => entry.key === key);
+      if(!item) return;
+      const fallbackKey = mapProhibitedToContentsKey(item.key);
+      if(!state.contentsCategoryKey){
+        ensureContentsByPreference(fallbackKey);
+      }
+      state.evriSelectedProhibitedKey = item.key;
+      state.evriProhibitedGroupKey = groupKey;
+      state.evriAdditionalSelection = "blocked";
+      state.evriAdditionalBlocked = true;
+      clearCompensationFlags();
       resetMulticarrierCompensationState();
       state.evriScreeningComplete = false;
       render();
+      return;
+    }
+
+    if(type === "loss_only_item"){
+      const item = LOSS_ONLY.find(entry => entry.key === key);
+      if(!item) return;
+      ensureContentsByPreference(mapLossOnlyToContentsKey(item.key));
+      state.coverLossOnlyKeys = new Set([item.key]);
+      state.coverNoCompKeys = new Set();
+      state.evriLossOnlySelected = true;
+      state.evriNoCompSelected = false;
+      state.evriSelectedProhibitedKey = null;
+      state.evriProhibitedGroupKey = "";
+      state.evriAdditionalSelection = "clear";
+      state.evriAdditionalBlocked = false;
+      resetMulticarrierCompensationState();
+      runMulticarrierCompensationCheck({ force:true });
+      state.evriScreeningComplete = false;
+      render();
+      return;
+    }
+
+    if(type === "no_comp_item"){
+      const item = NO_COMP.find(entry => entry.key === key);
+      if(!item) return;
+      ensureContentsByPreference(mapNoCompToContentsKey(item.key));
+      state.coverNoCompKeys = new Set([item.key]);
+      state.coverLossOnlyKeys = new Set();
+      state.evriNoCompSelected = true;
+      state.evriLossOnlySelected = false;
+      state.evriSelectedProhibitedKey = null;
+      state.evriProhibitedGroupKey = "";
+      state.evriAdditionalSelection = "clear";
+      state.evriAdditionalBlocked = false;
+      resetMulticarrierCompensationState();
+      runMulticarrierCompensationCheck({ force:true });
+      state.evriScreeningComplete = false;
+      render();
+    }
+  }
+
+  function showTileDetails(tile){
+    const icon = tile.icon || "category";
+    detailsTitle.innerHTML = `
+      <div class="icon"><span class="material-symbols-outlined">${icon}</span></div>
+      ${escapeHtml(tile.label)}
+    `;
+    detailsText.textContent = tile.prompt || "Select the best matching option.";
+    detailsBanner.className = "banner warn show";
+    detailsBanner.textContent = "Select the closest match to apply carrier-policy outcome.";
+    detailsActions.innerHTML = "";
+
+    let options = [];
+    if(tile.mode === "contents"){
+      options = contentsCategories.map(category => {
+        const check = evaluateMulticarrierCompensation(chosenService, category.key);
+        const sub = check.warningShown
+          ? "Outcome: No compensation warning (KIOSK-795)"
+          : "Outcome: Compensation covered";
+        return {
+          key: category.key,
+          label: category.label,
+          icon: "category",
+          sub,
+          type: "contents_category"
+        };
+      });
+    } else if(tile.mode === "prohibited_group"){
+      const group = prohibitedGroups.find(entry => entry.key === tile.groupKey);
+      const items = group ? group.items : [];
+      options = items.map(item => ({
+        key: item.key,
+        label: item.label,
+        icon: item.icon || "report",
+        sub: "Outcome: Prohibited item",
+        type: "prohibited_item",
+        groupKey: tile.groupKey
+      }));
+    } else if(tile.mode === "loss_only"){
+      options = LOSS_ONLY.map(item => ({
+        key: item.key,
+        label: item.label,
+        icon: item.icon || "shield",
+        sub: "Outcome: Loss-only compensation",
+        type: "loss_only_item"
+      }));
+    } else if(tile.mode === "no_comp"){
+      options = NO_COMP.map(item => ({
+        key: item.key,
+        label: item.label,
+        icon: item.icon || "gpp_bad",
+        sub: "Outcome: No compensation",
+        type: "no_comp_item"
+      }));
+    }
+
+    detailsInputs.innerHTML = `
+      <div class="rmConditionGroup">
+        <strong>Tell us what is inside</strong>
+        <div class="choiceGroup" id="evriDetailChoices">
+          ${options.map(option => `
+            <button type="button" class="choiceBtn" data-choice-type="${escapeHtml(option.type)}" data-choice-key="${escapeHtml(option.key)}" data-choice-group="${escapeHtml(option.groupKey || "")}">
+              <span style="display:flex; align-items:center; gap:8px;">
+                <span class="material-symbols-outlined" style="font-size:20px;">${escapeHtml(option.icon || "category")}</span>
+                ${escapeHtml(option.label)}
+              </span>
+              <span class="sub">${escapeHtml(option.sub)}</span>
+            </button>
+          `).join("")}
+        </div>
+      </div>
+    `;
+
+    const choiceButtons = document.querySelectorAll("#evriDetailChoices [data-choice-type]");
+    choiceButtons.forEach(btn => {
+      btn.addEventListener("click", ()=>{
+        const type = btn.getAttribute("data-choice-type") || "";
+        const key = btn.getAttribute("data-choice-key") || "";
+        const group = btn.getAttribute("data-choice-group") || "";
+        applySelection(type, key, group);
+      });
     });
+
+    details.classList.add("show");
+  }
+
+  document.querySelectorAll('.tile[data-mode="evri"]').forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const key = btn.dataset.key || "";
+      const tile = gridTiles.find(item => item.key === key);
+      if(!tile || tile.blank) return;
+
+      document.querySelectorAll('.tile[data-mode="evri"]').forEach(entry=>entry.classList.remove("selected"));
+      btn.classList.add("selected");
+
+      if(tile.mode === "other"){
+        applySelection("other", tile.key);
+        return;
+      }
+
+      showTileDetails(tile);
+    });
+  });
+
+  detailsClose.addEventListener("click", ()=>{
+    closeDetails();
+    document.querySelectorAll('.tile[data-mode="evri"]').forEach(entry=>entry.classList.remove("selected"));
+    if(activeTileKey){
+      const selected = document.querySelector(`.tile[data-mode="evri"][data-key="${activeTileKey}"]`);
+      if(selected) selected.classList.add("selected");
+    }
   });
 
   const evriCompAckChoices = document.querySelectorAll("#evriCompAckChoices .choiceBtn");
@@ -3624,118 +3906,25 @@ function renderEvriAdditionalScreening(){
     });
   }
 
-  document.querySelectorAll("#evriProhibitedGroupChoices .choiceBtn[data-group-key]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      state.evriProhibitedGroupKey = btn.dataset.groupKey || "";
-      state.evriAdditionalSelection = "";
-      state.evriSelectedProhibitedKey = null;
-      state.evriAdditionalBlocked = false;
-      state.evriScreeningComplete = false;
-      render();
-    });
-  });
-
-  const evriOtherNotListedBtn = document.getElementById("evriOtherNotListedBtn");
-  if(evriOtherNotListedBtn){
-    evriOtherNotListedBtn.addEventListener("click", ()=>{
-      state.evriProhibitedGroupKey = "";
-      state.evriAdditionalSelection = "clear";
-      state.evriSelectedProhibitedKey = null;
-      state.evriAdditionalBlocked = false;
-      state.evriScreeningComplete = false;
-      render();
-    });
-  }
-
-  document.querySelectorAll("#evriProhibitedItemChoices .choiceBtn[data-item-key]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      state.evriSelectedProhibitedKey = btn.dataset.itemKey || null;
-      state.evriAdditionalSelection = "blocked";
-      state.evriAdditionalBlocked = true;
-      state.evriScreeningComplete = false;
-      render();
-    });
-  });
-
-  const evriLossNoneBtn = document.getElementById("evriLossNoneBtn");
-  if(evriLossNoneBtn){
-    evriLossNoneBtn.addEventListener("click", ()=>{
-      state.coverLossOnlyKeys = new Set();
-      state.evriLossOnlySelected = false;
-      if(state.evriCompPicker === "loss") state.evriCompPicker = "";
-      state.evriScreeningComplete = false;
-      render();
-    });
-  }
-
-  const evriLossSelectBtn = document.getElementById("evriLossSelectBtn");
-  if(evriLossSelectBtn){
-    evriLossSelectBtn.addEventListener("click", ()=>{
-      state.evriCompPicker = state.evriCompPicker === "loss" ? "" : "loss";
-      render();
-    });
-  }
-
-  document.querySelectorAll("#evriLossChoices .choiceBtn[data-loss-key]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      const key = btn.dataset.lossKey || "";
-      if(!key) return;
-      if(state.coverLossOnlyKeys.has(key)) state.coverLossOnlyKeys.delete(key);
-      else state.coverLossOnlyKeys.add(key);
-      state.evriLossOnlySelected = state.coverLossOnlyKeys.size > 0;
-      state.evriScreeningComplete = false;
-      render();
-    });
-  });
-
-  const evriNoCompNoneBtn = document.getElementById("evriNoCompNoneBtn");
-  if(evriNoCompNoneBtn){
-    evriNoCompNoneBtn.addEventListener("click", ()=>{
-      state.coverNoCompKeys = new Set();
-      state.evriNoCompSelected = false;
-      if(state.evriCompPicker === "no_comp") state.evriCompPicker = "";
-      state.evriScreeningComplete = false;
-      render();
-    });
-  }
-
-  const evriNoCompSelectBtn = document.getElementById("evriNoCompSelectBtn");
-  if(evriNoCompSelectBtn){
-    evriNoCompSelectBtn.addEventListener("click", ()=>{
-      state.evriCompPicker = state.evriCompPicker === "no_comp" ? "" : "no_comp";
-      render();
-    });
-  }
-
-  document.querySelectorAll("#evriNoCompChoices .choiceBtn[data-nocomp-key]").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      const key = btn.dataset.nocompKey || "";
-      if(!key) return;
-      if(state.coverNoCompKeys.has(key)) state.coverNoCompKeys.delete(key);
-      else state.coverNoCompKeys.add(key);
-      state.evriNoCompSelected = state.coverNoCompKeys.size > 0;
-      state.evriScreeningComplete = false;
-      render();
-    });
-  });
-
   document.getElementById("evriScreeningBack").addEventListener("click", ()=>{
     state.evriScreeningOpen = false;
     render();
   });
 
   document.getElementById("evriScreeningConfirm").addEventListener("click", ()=>{
-    if(!state.contentsCategoryKey){
-      alert("Select contents category (KIOSK-408) before continuing.");
+    if(!state.evriAdditionalSelection){
+      alert("Select an item category before confirming EVRi/DPD screening.");
       return;
+    }
+    if(!state.contentsCategoryKey){
+      const fallback = firstAvailableContentsKey();
+      if(fallback){
+        setContentsByKey(fallback);
+      }
     }
     const latestCompensation = runMulticarrierCompensationCheck();
-    if(latestCompensation.warningShown && !state.multicarrierCompAcknowledged){
+    if(!state.evriAdditionalBlocked && latestCompensation.warningShown && !state.multicarrierCompAcknowledged){
       alert("Acknowledge the KIOSK-795 no-compensation warning before continuing.");
-      return;
-    }
-    if(!state.evriAdditionalSelection){
-      alert("Select the EVRi/DPD prohibited outcome before confirming screening.");
       return;
     }
     state.evriLossOnlySelected = state.coverLossOnlyKeys.size > 0;
