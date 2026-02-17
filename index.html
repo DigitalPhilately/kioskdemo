@@ -2682,10 +2682,10 @@ function render(){
     const niRoute = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
     if(stage === "service"){
       nextBtn.innerHTML = needsEvri
-        ? `Continue to compensation check <span class="material-symbols-outlined">arrow_forward</span>`
+        ? ((!state.evriScreeningComplete || state.evriAdditionalBlocked)
+          ? `Continue to EVRi/DPD screening <span class="material-symbols-outlined">arrow_forward</span>`
+          : `Continue to recipient details <span class="material-symbols-outlined">arrow_forward</span>`)
         : `Continue to recipient details <span class="material-symbols-outlined">arrow_forward</span>`;
-    } else if(stage === "mc_comp"){
-      nextBtn.innerHTML = `Acknowledge and continue <span class="material-symbols-outlined">arrow_forward</span>`;
     } else if(stage === "recipient"){
       nextBtn.innerHTML = needsEvri
         ? `Continue to sender details <span class="material-symbols-outlined">arrow_forward</span>`
@@ -3294,7 +3294,6 @@ function renderCaptureItemDetails(){
   const dest = state.destination === "uk" ? "UK Inland" : "International";
   const isDomestic = isDomesticJourney();
   const speedOptions = domesticDeliveryPreferences();
-  const contentsCategories = multicarrierContentsCategories();
   const speedSection = isDomestic ? `
         <h3 style="margin-top:14px;">Delivery speed preference (KIOSK-427)</h3>
         <div class="choiceRow3" id="captureSpeedChoices">
@@ -3340,20 +3339,6 @@ function renderCaptureItemDetails(){
       <h3 style="margin-top:14px;">Using the keypad, please enter the value of the item being posted (KIOSK-407)</h3>
       <input id="declaredValueInput" inputmode="decimal" placeholder="e.g. 49.99" value="${escapeHtml(state.declaredValue)}" />
 
-      <h3 style="margin-top:14px;">Declare contents category (KIOSK-408)</h3>
-      ${contentsCategories.length ? `
-        <div class="choiceGroup" id="contentsCategoryChoices">
-          ${contentsCategories.map(category => `
-            <button type="button" class="choiceBtn ${state.contentsCategoryKey===category.key?"active":""}" data-value="${escapeHtml(category.key)}">
-              <span>${escapeHtml(category.label)}</span>
-              <span class="sub">${escapeHtml(category.description || "Select category")}</span>
-            </button>
-          `).join("")}
-        </div>
-      ` : `
-        <div class="banner danger show" style="display:block;">Contents categories are missing from reference data.</div>
-      `}
-
       ${speedSection}
     </div>
   `;
@@ -3364,7 +3349,7 @@ function renderCaptureItemDetails(){
       document.querySelectorAll("#captureFormatChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
     });
   });
-  // Value and contents are captured on the same screen as sidecar confirmation.
+  // Value is captured on the same screen as sidecar confirmation.
   document.getElementById("declaredValueInput").addEventListener("input", (e)=>{
     let raw = (e.target.value || "").replace(/[^0-9.]/g, "");
     const firstDot = raw.indexOf(".");
@@ -3373,15 +3358,6 @@ function renderCaptureItemDetails(){
     }
     state.declaredValue = raw.slice(0, 10);
     e.target.value = state.declaredValue;
-  });
-  document.querySelectorAll("#contentsCategoryChoices .choiceBtn").forEach(btn=>{
-    btn.addEventListener("click", ()=>{
-      state.contentsCategoryKey = btn.dataset.value || "";
-      const category = selectedContentsCategory();
-      state.contentDescription = category ? category.label : "";
-      resetMulticarrierCompensationState();
-      document.querySelectorAll("#contentsCategoryChoices .choiceBtn").forEach(b=>b.classList.toggle("active", b===btn));
-    });
   });
   const speedChoices = document.querySelectorAll("#captureSpeedChoices .choiceBtn");
   speedChoices.forEach(btn=>{
@@ -3401,6 +3377,20 @@ function renderCaptureItemDetails(){
 }
 
 function renderEvriAdditionalScreening(){
+  const chosenService = selectedService();
+  const contentsCategories = multicarrierContentsCategories();
+  const selectedContents = selectedContentsCategory();
+  const compensationCheck = (chosenService && selectedContents)
+    ? runMulticarrierCompensationCheck()
+    : {
+      applies: !!(chosenService && chosenService.profile === "evri_dpd"),
+      eligible: true,
+      outcome: selectedContents ? "covered" : "missing_category",
+      warningShown: false,
+      reason: ""
+    };
+  const compensationWarning = !!compensationCheck.warningShown;
+  const backLabel = state.filterFlowStage === "sender" ? "Back to sender details" : "Back to service selection";
   const prohibitedGroups = EVRI_PROHIBITED_GROUPS.map(group => ({
     ...group,
     items: group.itemKeys
@@ -3435,8 +3425,53 @@ function renderEvriAdditionalScreening(){
     <div class="flowShell">
       <div class="flowMain">
         <div class="card">
+          <h3>0) Declare contents category (KIOSK-408)</h3>
+          <p>Select the best-matching contents category before carrier-policy checks.</p>
+          ${contentsCategories.length ? `
+            <div class="choiceGroup" id="evriContentsCategoryChoices">
+              ${contentsCategories.map(category => `
+                <button type="button" class="choiceBtn ${state.contentsCategoryKey===category.key?"active":""}" data-category-key="${escapeHtml(category.key)}">
+                  <span>${escapeHtml(category.label)}</span>
+                  <span class="sub">${escapeHtml(category.description || "Select category")}</span>
+                </button>
+              `).join("")}
+            </div>
+          ` : `
+            <div class="banner danger show" style="display:block;">Contents categories are missing from reference data.</div>
+          `}
+          ${!state.contentsCategoryKey ? `
+            <div class="banner warn show" style="display:block; margin-top:10px;">
+              Select contents category to continue.
+            </div>
+          ` : compensationWarning ? `
+            <div class="banner danger show" style="display:block; margin-top:10px;">
+              <strong>KIOSK-795: Not covered by compensation.</strong><br/>
+              ${escapeHtml(compensationCheck.reason || "The selected contents category is not covered by compensation for this multicarrier service.")}<br/><br/>
+              If this parcel is lost or damaged on this service, compensation will not be payable.
+            </div>
+          ` : `
+            <div class="banner ok show" style="display:block; margin-top:10px;">
+              KIOSK-795: Category is covered (no compensation exclusion warning).
+            </div>
+          `}
+          ${compensationWarning ? `
+            <div class="choiceRow" style="margin-top:10px;" id="evriCompAckChoices">
+              <button type="button" class="choiceBtn ${state.multicarrierCompAcknowledged ? "active" : ""}" data-value="yes">
+                <span>I understand and want to continue</span>
+              </button>
+              <button type="button" class="choiceBtn ${!state.multicarrierCompAcknowledged ? "active" : ""}" data-value="no">
+                <span>Not acknowledged</span>
+              </button>
+            </div>
+            <button type="button" class="btn" id="evriCompChangeServiceBtn" style="margin-top:10px;">
+              <span class="material-symbols-outlined">swap_horiz</span>Choose different service
+            </button>
+          ` : ""}
+        </div>
+
+        <div class="card">
           <h3>1) Prohibited check (required)</h3>
-          <p>Select the relevant prohibited group. Then choose the exact category.</p>
+          <p>Select prohibited group, then exact category to apply KIOSK-411 policy blocking.</p>
           <div class="choiceGroup" id="evriProhibitedGroupChoices">
             ${prohibitedGroups.map(group => `
               <button type="button" class="choiceBtn ${state.evriProhibitedGroupKey===group.key ? "active" : ""}" data-group-key="${escapeHtml(group.key)}">
@@ -3521,11 +3556,13 @@ function renderEvriAdditionalScreening(){
         <div class="card" style="margin-top:14px;">
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <span class="tag"><span class="material-symbols-outlined">report</span>${escapeHtml(state.evriAdditionalSelection === "blocked" ? `Prohibited: ${selectedProhibitedItem ? selectedProhibitedItem.label : "Selected"}` : "Prohibited: Other / not listed")}</span>
+            <span class="tag"><span class="material-symbols-outlined">category</span>Contents: ${escapeHtml(selectedContents ? selectedContents.label : "Not selected")}</span>
+            <span class="tag"><span class="material-symbols-outlined">gpp_maybe</span>K795: ${escapeHtml(compensationWarning ? (state.multicarrierCompAcknowledged ? "Not covered (ack)" : "Not covered (pending ack)") : (selectedContents ? "Covered" : "Pending"))}</span>
             <span class="tag"><span class="material-symbols-outlined">package_2</span>Loss-only: ${state.coverLossOnlyKeys.size ? "Yes" : "No"}</span>
             <span class="tag"><span class="material-symbols-outlined">gpp_bad</span>No-comp: ${state.coverNoCompKeys.size ? "Yes" : "No"}</span>
           </div>
           <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
-            <button class="btn" id="evriScreeningBack"><span class="material-symbols-outlined">arrow_back</span>Back to sender details</button>
+            <button class="btn" id="evriScreeningBack"><span class="material-symbols-outlined">arrow_back</span>${escapeHtml(backLabel)}</button>
             <button class="btn primary" id="evriScreeningConfirm"><span class="material-symbols-outlined">task_alt</span>Confirm EVRi/DPD screening</button>
           </div>
         </div>
@@ -3533,13 +3570,59 @@ function renderEvriAdditionalScreening(){
       <aside class="flowAside">
         <div class="flowNarrative">
           <h4>Journey Note</h4>
-          <p>Step 1: select prohibited group, then exact item (or choose Other / not listed).</p>
-          <p>Step 2: loss-only and no-comp lists are optional and only open when needed.</p>
-          <p>Confirm screening to continue.</p>
+          <p>Step 0 (KIOSK-408): declare contents category.</p>
+          <p>Step 1 (KIOSK-411): block prohibited categories.</p>
+          <p>Step 2 (KIOSK-795): if not covered, customer must acknowledge warning.</p>
+          <p>Loss-only/no-comp flags are optional and only open when needed.</p>
         </div>
       </aside>
     </div>
   `;
+
+  document.querySelectorAll("#evriContentsCategoryChoices .choiceBtn[data-category-key]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const nextCategory = btn.dataset.categoryKey || "";
+      state.contentsCategoryKey = nextCategory;
+      const category = selectedContentsCategory();
+      state.contentDescription = category ? category.label : "";
+      resetMulticarrierCompensationState();
+      state.evriScreeningComplete = false;
+      render();
+    });
+  });
+
+  const evriCompAckChoices = document.querySelectorAll("#evriCompAckChoices .choiceBtn");
+  evriCompAckChoices.forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const acknowledge = (btn.dataset.value || "") === "yes";
+      if(acknowledge && !state.multicarrierCompAcknowledged){
+        const category = selectedContentsCategory();
+        const service = selectedService();
+        logAudit("kiosk_795_compensation_acknowledged", {
+          serviceId: service ? service.id : "",
+          serviceName: service ? service.name : "",
+          contentsCategory: category ? category.key : state.contentsCategoryKey,
+          contentsCategoryLabel: category ? category.label : "",
+          compensationEligibilityOutcome: state.multicarrierCompOutcome || "not_covered",
+          warningShown: true,
+          customerAcknowledged: true
+        });
+      }
+      state.multicarrierCompAcknowledged = acknowledge;
+      state.evriScreeningComplete = false;
+      render();
+    });
+  });
+
+  const evriCompChangeServiceBtn = document.getElementById("evriCompChangeServiceBtn");
+  if(evriCompChangeServiceBtn){
+    evriCompChangeServiceBtn.addEventListener("click", ()=>{
+      state.multicarrierCompAcknowledged = false;
+      state.evriScreeningOpen = false;
+      state.filterFlowStage = "service";
+      render();
+    });
+  }
 
   document.querySelectorAll("#evriProhibitedGroupChoices .choiceBtn[data-group-key]").forEach(btn=>{
     btn.addEventListener("click", ()=>{
@@ -3642,6 +3725,15 @@ function renderEvriAdditionalScreening(){
   });
 
   document.getElementById("evriScreeningConfirm").addEventListener("click", ()=>{
+    if(!state.contentsCategoryKey){
+      alert("Select contents category (KIOSK-408) before continuing.");
+      return;
+    }
+    const latestCompensation = runMulticarrierCompensationCheck();
+    if(latestCompensation.warningShown && !state.multicarrierCompAcknowledged){
+      alert("Acknowledge the KIOSK-795 no-compensation warning before continuing.");
+      return;
+    }
     if(!state.evriAdditionalSelection){
       alert("Select the EVRi/DPD prohibited outcome before confirming screening.");
       return;
@@ -3654,15 +3746,20 @@ function renderEvriAdditionalScreening(){
       render();
       return;
     }
-    if(state.step === 4 && state.filterFlowStage === "sender"){
-      const recipientIsBT = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
-      if(recipientIsBT){
-        state.filterFlowStage = "ni";
-        render();
+    if(state.step === 4){
+      if(state.filterFlowStage === "sender"){
+        const recipientIsBT = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
+        if(recipientIsBT){
+          state.filterFlowStage = "ni";
+          render();
+          return;
+        }
+        state.basketAdded = true;
+        navigateToStep(5);
         return;
       }
-      state.basketAdded = true;
-      navigateToStep(5);
+      state.filterFlowStage = "recipient";
+      render();
       return;
     }
     render();
@@ -3732,9 +3829,9 @@ function renderFilterAndPresentOptions(){
     ? `EVRi/DPD screening: ${state.evriScreeningComplete ? "complete" : "pending"}${state.evriAdditionalSelection === "blocked" ? ` (blocked by ${evriProhibitedLabel})` : ""}.`
     : "Carrier-specific EVRi/DPD screening not required for current service.";
   const narrativeComp = !chosenService
-    ? "KIOSK-795 compensation check will run after multicarrier service selection."
+    ? "KIOSK-795 compensation check is part of EVRi/DPD additional screening."
     : needsEvriAdditional
-    ? "KIOSK-795 compensation eligibility check required before address capture."
+    ? "KIOSK-795 compensation eligibility check required in the EVRi/DPD screening step."
     : "KIOSK-795 compensation check not required for Royal Mail.";
   const narrativeNI = showNI
     ? `NI movement information: ${niMovementValidation().length ? "pending" : "complete"}${state.niCustomsReference ? ` (${state.niCustomsReference})` : ""}.`
@@ -3745,11 +3842,6 @@ function renderFilterAndPresentOptions(){
 
   const stage = state.filterFlowStage || "service";
   if(stage === "sender" && !needsEvriAdditional){
-    state.filterFlowStage = "recipient";
-    renderFilterAndPresentOptions();
-    return;
-  }
-  if(stage === "mc_comp" && !needsEvriAdditional){
     state.filterFlowStage = "recipient";
     renderFilterAndPresentOptions();
     return;
@@ -3773,7 +3865,7 @@ function renderFilterAndPresentOptions(){
       <div class="stepHeader">
         <div>
           <h1>Select postage product (KIOSK-414)</h1>
-          <p class="subtitle">Choose a product to continue to destination address details.</p>
+          <p class="subtitle">Choose a product. EVRi/DPD selections continue to additional goods/content screening.</p>
         </div>
         <span class="pill"><span class="material-symbols-outlined">tune</span> Service filtering</span>
       </div>
@@ -3798,7 +3890,9 @@ function renderFilterAndPresentOptions(){
         <aside class="flowAside">
           <div class="flowNarrative">
             <h4>Journey Note</h4>
-            <p>Select a postage product, then continue.</p>
+            <p>${chosenService && chosenService.profile === "evri_dpd"
+              ? "Selected EVRi/DPD: next screen is KIOSK-408/KIOSK-411/KIOSK-795 screening."
+              : "Select a postage product, then continue to recipient details."}</p>
             <p>${escapeHtml(narrativeContents)}</p>
             <p>${escapeHtml(narrativeComp)}</p>
             <p>${escapeHtml(narrativeSpeed)}</p>
@@ -3815,133 +3909,6 @@ function renderFilterAndPresentOptions(){
         render();
       });
     });
-    return;
-  }
-
-  if(stage === "mc_comp"){
-    if(!chosenService || chosenService.profile !== "evri_dpd"){
-      state.filterFlowStage = "recipient";
-      renderFilterAndPresentOptions();
-      return;
-    }
-    if(!contentsCategory){
-      screen.innerHTML = `
-        <div class="stepHeader">
-          <div>
-            <h1>Compensation check (KIOSK-795)</h1>
-            <p class="subtitle">Contents category is required before multicarrier compensation checks can run.</p>
-          </div>
-          <span class="pill"><span class="material-symbols-outlined">gpp_maybe</span> KIOSK-795</span>
-        </div>
-        <div class="card">
-          <div class="banner danger show" style="display:block;">
-            Select a contents category in KIOSK-408 before choosing an EVRi/DPD service.
-          </div>
-          <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
-            <button type="button" class="btn" id="backToItemDetailsBtn">
-              <span class="material-symbols-outlined">arrow_back</span>Back to item details
-            </button>
-            <button type="button" class="btn ghost" id="backToServiceFromMissingCategoryBtn">
-              <span class="material-symbols-outlined">arrow_back</span>Back to service list
-            </button>
-          </div>
-        </div>
-      `;
-      const backToItemDetailsBtn = document.getElementById("backToItemDetailsBtn");
-      if(backToItemDetailsBtn){
-        backToItemDetailsBtn.addEventListener("click", ()=>{
-          navigateToStep(3);
-        });
-      }
-      const backToServiceFromMissingCategoryBtn = document.getElementById("backToServiceFromMissingCategoryBtn");
-      if(backToServiceFromMissingCategoryBtn){
-        backToServiceFromMissingCategoryBtn.addEventListener("click", ()=>{
-          state.filterFlowStage = "service";
-          render();
-        });
-      }
-      return;
-    }
-
-    const check = runMulticarrierCompensationCheck();
-    if(check.eligible){
-      state.filterFlowStage = "recipient";
-      renderFilterAndPresentOptions();
-      return;
-    }
-
-    const warningText = check.reason || "This item is not covered by compensation on the selected multicarrier service.";
-    screen.innerHTML = `
-      <div class="stepHeader">
-        <div>
-          <h1>Compensation exclusion warning (KIOSK-795)</h1>
-          <p class="subtitle">Multicarrier only: review and acknowledge before continuing.</p>
-        </div>
-        <span class="pill"><span class="material-symbols-outlined">warning</span> KIOSK-795</span>
-      </div>
-
-      <div class="flowShell">
-        <div class="flowMain">
-          <div class="card">
-            <h3>Selected multicarrier service</h3>
-            <div class="helpNote">
-              <strong>Service:</strong> ${escapeHtml(chosenService.name)}<br/>
-              <strong>Contents category:</strong> ${escapeHtml(contentsCategory.label)}
-            </div>
-          </div>
-          <div class="card">
-            <div class="banner danger show" style="display:block;">
-              <strong>Item not covered by compensation.</strong><br/>
-              ${escapeHtml(warningText)}<br/><br/>
-              If this parcel is lost or damaged on this service, compensation will not be payable.
-            </div>
-            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
-              <button type="button" class="btn primary" id="mcCompAcknowledgeBtn">
-                I understand - continue anyway <span class="material-symbols-outlined">arrow_forward</span>
-              </button>
-              <button type="button" class="btn" id="mcCompChangeServiceBtn">
-                <span class="material-symbols-outlined">swap_horiz</span>Choose different service
-              </button>
-            </div>
-          </div>
-        </div>
-        <aside class="flowAside">
-          <div class="flowNarrative">
-            <h4>Journey Note</h4>
-            <p>KIOSK-795 applies only to multicarrier products.</p>
-            <p>Customer must acknowledge the no-compensation warning before journey continues.</p>
-            <p>Customer can return to service selection to choose an alternative service.</p>
-          </div>
-        </aside>
-      </div>
-    `;
-
-    const mcCompAcknowledgeBtn = document.getElementById("mcCompAcknowledgeBtn");
-    if(mcCompAcknowledgeBtn){
-      mcCompAcknowledgeBtn.addEventListener("click", ()=>{
-        state.multicarrierCompAcknowledged = true;
-        logAudit("kiosk_795_compensation_acknowledged", {
-          serviceId: chosenService.id,
-          serviceName: chosenService.name,
-          contentsCategory: contentsCategory.key,
-          contentsCategoryLabel: contentsCategory.label,
-          compensationEligibilityOutcome: state.multicarrierCompOutcome || "not_covered",
-          warningShown: true,
-          customerAcknowledged: true
-        });
-        state.filterFlowStage = "recipient";
-        render();
-      });
-    }
-
-    const mcCompChangeServiceBtn = document.getElementById("mcCompChangeServiceBtn");
-    if(mcCompChangeServiceBtn){
-      mcCompChangeServiceBtn.addEventListener("click", ()=>{
-        state.multicarrierCompAcknowledged = false;
-        state.filterFlowStage = "service";
-        render();
-      });
-    }
     return;
   }
 
@@ -4062,9 +4029,6 @@ function renderFilterAndPresentOptions(){
             <h3>Sender details (KIOSK-866)</h3>
             <input id="senderPostcodeInput" placeholder="Sender postcode" value="${escapeHtml(state.senderPostcode)}" />
             <input id="senderAddressInput" placeholder="Sender address line" value="${escapeHtml(state.senderAddress)}" style="margin-top:8px;" />
-            <button type="button" class="btn primary" id="openEvriScreeningBtn" style="margin-top:12px;">
-              Continue to EVRi/DPD screening <span class="material-symbols-outlined">arrow_forward</span>
-            </button>
           </div>
         </div>
         <aside class="flowAside">
@@ -4072,9 +4036,9 @@ function renderFilterAndPresentOptions(){
             <h4>Journey Note</h4>
             <p>EVRi/DPD product selected: sender details are required.</p>
             <p>${state.destination === "uk" && isBTPostcode(state.recipientPostcode)
-              ? "Next screens: EVRi/DPD goods/content screening, then NI movement information."
-              : "Next screen: EVRi/DPD goods/content screening."}</p>
-            <p>${state.evriScreeningComplete ? "EVRi/DPD screening currently complete." : "EVRi/DPD screening currently pending."}</p>
+              ? "Next screen: NI movement information."
+              : "Next screen: basket review."}</p>
+            <p>${state.evriScreeningComplete ? "EVRi/DPD screening complete." : "EVRi/DPD screening pending."}</p>
           </div>
         </aside>
       </div>
@@ -4092,26 +4056,6 @@ function renderFilterAndPresentOptions(){
     sa.addEventListener("input", (e)=>{
       state.senderAddress = (e.target.value || "").slice(0, 80);
       e.target.value = state.senderAddress;
-    });
-    const openEvriScreeningBtn = document.getElementById("openEvriScreeningBtn");
-    if(openEvriScreeningBtn){
-      openEvriScreeningBtn.addEventListener("click", ()=>{
-        if(!state.senderPostcode || !state.senderAddress){
-          alert("Enter sender postcode and first address line before continuing.");
-          return;
-        }
-        state.evriScreeningOpen = true;
-        render();
-      });
-    }
-    [sp, sa].forEach((el)=>{
-      if(!el) return;
-      el.addEventListener("keydown", (e)=>{
-        if(e.key === "Enter"){
-          e.preventDefault();
-          if(openEvriScreeningBtn) openEvriScreeningBtn.click();
-        }
-      });
     });
     return;
   }
@@ -4519,13 +4463,14 @@ function renderBasketAndPay(){
       const compensation = runMulticarrierCompensationCheck();
       if(compensation.warningShown && !state.multicarrierCompAcknowledged){
         alert("Acknowledge the KIOSK-795 compensation warning before finishing.");
-        state.filterFlowStage = "mc_comp";
+        state.filterFlowStage = "service";
+        state.evriScreeningOpen = true;
         navigateToStep(4);
         return;
       }
       if(!state.evriScreeningComplete || state.evriAdditionalBlocked){
         alert("Complete EVRi/DPD additional screening before finishing.");
-        state.filterFlowStage = "sender";
+        state.filterFlowStage = "service";
         state.evriScreeningOpen = true;
         navigateToStep(4);
         return;
@@ -4818,9 +4763,7 @@ function canContinue(){
 
   if(state.step === 3){
     const speedOk = !isDomesticJourney() || isValidDomesticDeliveryPreference(state.deliverySpeed);
-    const categories = multicarrierContentsCategories();
-    const categoryOk = !categories.length || !!state.contentsCategoryKey;
-    return !!state.format && numericValue(state.declaredValue) > 0 && speedOk && categoryOk;
+    return !!state.format && numericValue(state.declaredValue) > 0 && speedOk;
   }
 
   if(state.step === 4){
@@ -4829,9 +4772,6 @@ function canContinue(){
     const needsEvri = !!(service && service.profile === "evri_dpd");
     if(stage === "service"){
       return !!state.selectedServiceId;
-    }
-    if(stage === "mc_comp"){
-      return !!state.multicarrierCompAcknowledged;
     }
     if(stage === "recipient"){
       return !!state.selectedServiceId && !!state.recipientPostcode && !!state.recipientAddress;
@@ -4878,18 +4818,14 @@ function next(){
     }
     if(state.step === 3){
       alert(isDomesticJourney()
-        ? "Confirm format, enter item value, select contents category, and choose delivery speed preference before continuing."
-        : "Confirm format, enter item value, and select contents category before continuing.");
+        ? "Confirm format, enter item value, and choose delivery speed preference before continuing."
+        : "Confirm format and enter item value before continuing.");
       return;
     }
     if(state.step === 4){
       const stage = state.filterFlowStage || "service";
       if(stage === "service"){
         alert("Select a postage product before continuing.");
-        return;
-      }
-      if(stage === "mc_comp"){
-        alert("Acknowledge the compensation warning or choose a different service.");
         return;
       }
       if(stage === "recipient"){
@@ -4936,14 +4872,8 @@ function next(){
 
     if(stage === "service"){
       if(needsEvri){
-        if(!state.contentsCategoryKey){
-          alert("Select contents category (KIOSK-408) before multicarrier compensation checks.");
-          navigateToStep(3);
-          return;
-        }
-        const compensation = runMulticarrierCompensationCheck();
-        if(compensation.warningShown && !state.multicarrierCompAcknowledged){
-          state.filterFlowStage = "mc_comp";
+        if(!state.evriScreeningComplete || state.evriAdditionalBlocked){
+          state.evriScreeningOpen = true;
           render();
           return;
         }
@@ -4952,13 +4882,13 @@ function next(){
       render();
       return;
     }
-    if(stage === "mc_comp"){
-      state.filterFlowStage = "recipient";
-      render();
-      return;
-    }
     if(stage === "recipient"){
       if(needsEvri){
+        if(!state.evriScreeningComplete || state.evriAdditionalBlocked){
+          state.evriScreeningOpen = true;
+          render();
+          return;
+        }
         state.filterFlowStage = "sender";
         render();
         return;
@@ -5016,11 +4946,6 @@ function back(){
       return;
     }
     const stage = state.filterFlowStage || "service";
-    if(stage === "mc_comp"){
-      state.filterFlowStage = "service";
-      render();
-      return;
-    }
     if(stage === "ni"){
       const service = selectedService();
       const needsEvri = !!(service && service.profile === "evri_dpd");
