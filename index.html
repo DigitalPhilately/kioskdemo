@@ -361,7 +361,7 @@
       overflow:hidden;
       white-space:nowrap;
     }
-    .tile .label{font-weight:900;font-size:15px;line-height:1.2;overflow-wrap:anywhere;word-break:break-word;}
+    .tile .label{font-weight:900;font-size:15px;line-height:1.2;overflow-wrap:break-word;word-break:normal;}
     .tile.selected{border-color:var(--accent2);box-shadow:0 0 0 4px rgba(46,122,184,.18);}
     .details{
       margin-top:0;border:1px solid var(--border);
@@ -3474,23 +3474,26 @@ function renderEvriAdditionalScreening(){
       key: `evri_prohibited_${group.key}`,
       mode: "prohibited_group",
       icon: (group.items[0] && group.items[0].icon) ? group.items[0].icon : "report",
-      label: group.label,
+      label: (() => {
+        const shortMap = {
+          evpg_animals_food: "Animals / food",
+          evpg_batteries_medical: "Batteries / medical",
+          evpg_gases_hazardous: "Hazardous / liquids",
+          evpg_illegal_controlled: "Illegal / controlled",
+          evpg_toxic_radioactive: "Toxic / radioactive",
+          evpg_vehicles_weapons: "Vehicles / weapons"
+        };
+        return shortMap[group.key] || group.label;
+      })(),
       prompt: group.prompt || "Select the exact prohibited item category.",
       groupKey: group.key
     })),
     {
-      key: "evri_loss_only",
-      mode: "loss_only",
+      key: "evri_comp",
+      mode: "compensation",
       icon: "shield",
-      label: "Loss-only items",
-      prompt: "Select the matching loss-only category."
-    },
-    {
-      key: "evri_no_comp",
-      mode: "no_comp",
-      icon: "gpp_bad",
-      label: "No-comp items",
-      prompt: "Select the matching no-compensation category."
+      label: "Compensation limits",
+      prompt: "Select whether the item is loss-only or no-compensation."
     }
   ];
   const otherTile = {
@@ -3513,10 +3516,8 @@ function renderEvriAdditionalScreening(){
     if(selectedGroup){
       activeTileKey = `evri_prohibited_${selectedGroup.key}`;
     }
-  } else if(state.coverNoCompKeys.size){
-    activeTileKey = "evri_no_comp";
-  } else if(state.coverLossOnlyKeys.size){
-    activeTileKey = "evri_loss_only";
+  } else if(state.coverNoCompKeys.size || state.coverLossOnlyKeys.size){
+    activeTileKey = "evri_comp";
   } else if(state.contentsCategoryKey){
     activeTileKey = "evri_contents";
   } else if(state.evriAdditionalSelection === "clear"){
@@ -3583,8 +3584,7 @@ function renderEvriAdditionalScreening(){
       <span class="pill"><span class="material-symbols-outlined">policy</span> Additional carrier checks</span>
     </div>
 
-    <div class="flowShell">
-      <div class="flowMain">
+    <div style="margin-top:14px;">
         <div class="gridWrap">
           <div class="grid" id="evriGrid"></div>
 
@@ -3632,15 +3632,6 @@ function renderEvriAdditionalScreening(){
             <button class="btn primary" id="evriScreeningConfirm"><span class="material-symbols-outlined">task_alt</span>Confirm EVRi/DPD screening</button>
           </div>
         </div>
-      </div>
-      <aside class="flowAside">
-        <div class="flowNarrative">
-          <h4>Journey Note</h4>
-          <p>Single-screen flow: select icon, choose exact item, then apply outcome.</p>
-          <p>KIOSK-408 contents declaration, KIOSK-411 prohibited filtering, and KIOSK-795 compensation warning are merged.</p>
-          <p>If not covered, customer acknowledgement is required before continuing.</p>
-        </div>
-      </aside>
     </div>
   `;
 
@@ -3798,22 +3789,23 @@ function renderEvriAdditionalScreening(){
         type: "prohibited_item",
         groupKey: tile.groupKey
       }));
-    } else if(tile.mode === "loss_only"){
-      options = LOSS_ONLY.map(item => ({
-        key: item.key,
-        label: item.label,
-        icon: item.icon || "shield",
-        sub: "Outcome: Loss-only compensation",
-        type: "loss_only_item"
-      }));
-    } else if(tile.mode === "no_comp"){
-      options = NO_COMP.map(item => ({
-        key: item.key,
-        label: item.label,
-        icon: item.icon || "gpp_bad",
-        sub: "Outcome: No compensation",
-        type: "no_comp_item"
-      }));
+    } else if(tile.mode === "compensation"){
+      options = [
+        ...LOSS_ONLY.map(item => ({
+          key: item.key,
+          label: item.label,
+          icon: item.icon || "shield",
+          sub: "Loss-only compensation",
+          type: "loss_only_item"
+        })),
+        ...NO_COMP.map(item => ({
+          key: item.key,
+          label: item.label,
+          icon: item.icon || "gpp_bad",
+          sub: "No compensation",
+          type: "no_comp_item"
+        }))
+      ];
     }
 
     detailsInputs.innerHTML = `
@@ -4834,6 +4826,9 @@ function tileEl(item, mode, multi=false){
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "tile";
+  if(mode === "evri"){
+    btn.classList.add("tileEvri");
+  }
   btn.dataset.key = item.key;
   btn.dataset.mode = mode;
   btn.dataset.multi = multi ? "1" : "0";
