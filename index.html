@@ -3467,8 +3467,8 @@ function renderEvriAdditionalScreening(){
       key: "evri_contents",
       mode: "contents",
       icon: "category",
-      label: "Declared contents",
-      prompt: "Choose the best-matching contents category for KIOSK-408 / KIOSK-795."
+      label: "Contents type",
+      prompt: "Choose contents type for compensation checks (KIOSK-408 / KIOSK-795)."
     },
     ...prohibitedGroups.map(group => ({
       key: `evri_prohibited_${group.key}`,
@@ -3500,8 +3500,8 @@ function renderEvriAdditionalScreening(){
     key: "evri_other",
     mode: "other",
     icon: "check_circle",
-    label: "Other / not listed",
-    prompt: "Use this when the item does not match any listed category."
+    label: "No prohibited match",
+    prompt: "Use this when none of the prohibited categories match your item."
   };
   const gridTiles = [...tileBase];
   const activeSlots = Math.ceil((gridTiles.length + 1) / 5) * 5;
@@ -3606,7 +3606,7 @@ function renderEvriAdditionalScreening(){
             ${escapeHtml(outcomeText)}
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
-            <span class="tag"><span class="material-symbols-outlined">report</span>${escapeHtml(state.evriAdditionalSelection === "blocked" ? `Prohibited: ${selectedProhibitedItem ? selectedProhibitedItem.label : "Selected"}` : "Prohibited: Other / not listed")}</span>
+            <span class="tag"><span class="material-symbols-outlined">report</span>${escapeHtml(state.evriAdditionalSelection === "blocked" ? `Prohibited: ${selectedProhibitedItem ? selectedProhibitedItem.label : "Selected"}` : "Prohibited: None matched")}</span>
             <span class="tag"><span class="material-symbols-outlined">category</span>Contents: ${escapeHtml(selectedContents ? selectedContents.label : "Not selected")}</span>
             <span class="tag"><span class="material-symbols-outlined">gpp_maybe</span>K795: ${escapeHtml(compensationWarning ? (state.multicarrierCompAcknowledged ? "Not covered (ack)" : "Not covered (pending ack)") : (selectedContents ? "Covered" : "Pending"))}</span>
             <span class="tag"><span class="material-symbols-outlined">package_2</span>Loss-only: ${state.coverLossOnlyKeys.size ? "Yes" : "No"}</span>
