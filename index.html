@@ -3629,7 +3629,7 @@ function renderEvriAdditionalScreening(){
 
           <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
             <button class="btn" id="evriScreeningBack"><span class="material-symbols-outlined">arrow_back</span>${escapeHtml(backLabel)}</button>
-            <button class="btn primary" id="evriScreeningConfirm"><span class="material-symbols-outlined">task_alt</span>Confirm EVRi/DPD screening</button>
+            <button class="btn primary" id="evriScreeningConfirm"><span class="material-symbols-outlined">arrow_forward</span>Continue</button>
           </div>
         </div>
     </div>
@@ -3658,6 +3658,26 @@ function renderEvriAdditionalScreening(){
     detailsBanner.className = "banner";
   }
 
+  function continueAfterScreening(){
+    if(state.step === 4){
+      if(state.filterFlowStage === "sender"){
+        const recipientIsBT = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
+        if(recipientIsBT){
+          state.filterFlowStage = "ni";
+          render();
+          return;
+        }
+        state.basketAdded = true;
+        navigateToStep(5);
+        return;
+      }
+      state.filterFlowStage = "recipient";
+      render();
+      return;
+    }
+    render();
+  }
+
   function applySelection(type, key, groupKey = ""){
     if(type === "other"){
       state.evriSelectedProhibitedKey = null;
@@ -3675,8 +3695,17 @@ function renderEvriAdditionalScreening(){
       if(state.contentsCategoryKey){
         runMulticarrierCompensationCheck({ force:true });
       }
-      state.evriScreeningComplete = false;
-      render();
+      const comp = runMulticarrierCompensationCheck();
+      if(comp.warningShown && !state.multicarrierCompAcknowledged){
+        state.evriScreeningComplete = false;
+        render();
+        return;
+      }
+      state.evriLossOnlySelected = false;
+      state.evriNoCompSelected = false;
+      state.evriScreeningComplete = true;
+      state.evriScreeningOpen = false;
+      continueAfterScreening();
       return;
     }
 
@@ -3905,7 +3934,7 @@ function renderEvriAdditionalScreening(){
 
   document.getElementById("evriScreeningConfirm").addEventListener("click", ()=>{
     if(!state.evriAdditionalSelection){
-      alert("Select an item category before confirming EVRi/DPD screening.");
+      alert("Select an item category before continuing.");
       return;
     }
     if(!state.contentsCategoryKey){
@@ -3927,23 +3956,7 @@ function renderEvriAdditionalScreening(){
       render();
       return;
     }
-    if(state.step === 4){
-      if(state.filterFlowStage === "sender"){
-        const recipientIsBT = state.destination === "uk" && isBTPostcode(state.recipientPostcode);
-        if(recipientIsBT){
-          state.filterFlowStage = "ni";
-          render();
-          return;
-        }
-        state.basketAdded = true;
-        navigateToStep(5);
-        return;
-      }
-      state.filterFlowStage = "recipient";
-      render();
-      return;
-    }
-    render();
+    continueAfterScreening();
   });
 }
 
