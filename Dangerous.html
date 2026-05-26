@@ -2170,7 +2170,7 @@ function availableServices(){
     list = list.filter(service => serviceMatchesDeliveryPreference(service, state.deliverySpeed));
   }
 
-  // Prioritise tracked services in display order (mirrors KIOSK-415 intent).
+  // Prioritise tracked services in display order.
   return list.sort((a,b) => Number(b.tracked) - Number(a.tracked) || calculateServicePrice(a) - calculateServicePrice(b));
 }
 
@@ -2612,7 +2612,7 @@ function updateBreadcrumb(){
     { icon:"payments", label:"Value", value },
     { icon:"bolt", label:"Speed", value: speed },
     { icon:"local_shipping", label:"Service", value: service ? service.name : "Not set" },
-    { icon:"gpp_maybe", label:"K795", value: compensationStatus },
+    { icon:"gpp_maybe", label:"Compensation", value: compensationStatus },
     { icon:"location_on", label:"NI movement", value: niStatus },
     { icon:"fact_check", label:"EVRi/DPD", value: carrierStatus }
   ];
@@ -2719,7 +2719,7 @@ function renderWeigh(){
         <h1>Place Item On Scales</h1>
         <p class="subtitle">Place your item on the scales with the address facing up.</p>
       </div>
-      <span class="pill"><span class="material-symbols-outlined">scale</span> Item On Scales (KIOSK-404)</span>
+      <span class="pill"><span class="material-symbols-outlined">scale</span> Item On Scales</span>
     </div>
 
     <div class="flowShell">
@@ -2762,8 +2762,8 @@ function renderWeigh(){
       <aside class="flowAside">
         <div class="flowNarrative">
           <h4>Journey Note</h4>
-          <p>Customer selects "Post an Item" (KIOSK-402) to launch the flow. In R1.0 destination defaults to UK (Inc NI); in R1.1 customers must select destination before proceeding.</p>
-          <p>Next step is Royal Mail dangerous goods screening (KIOSK-410).</p>
+          <p>Customer selects "Post an Item" to launch the flow. In R1.0 destination defaults to UK (Inc NI); in R1.1 customers must select destination before proceeding.</p>
+          <p>Next step is Royal Mail dangerous goods screening.</p>
         </div>
       </aside>
     </div>
@@ -2840,10 +2840,10 @@ function renderProhibited(){
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Screen for prohibited or restricted items (KIOSK-409)</h1>
+        <h1>Screen for prohibited or restricted items</h1>
         <p class="subtitle"><strong>Check contents against prohibited categories.</strong> Select one option to continue.</p>
       </div>
-      <span class="pill"><span class="material-symbols-outlined">block</span> Prohibited check (KIOSK-410)</span>
+      <span class="pill"><span class="material-symbols-outlined">block</span> Prohibited check</span>
     </div>
 
     <div class="gridWrap">
@@ -2899,7 +2899,7 @@ function renderRMDangerous(){
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Screen for Dangerous Goods (KIOSK-410)</h1>
+        <h1>Screen for Dangerous Goods</h1>
         <p class="subtitle"><strong>Does your item contain any of the following?</strong> Select a category, then confirm the exact item in a follow-up step.</p>
       </div>
       <span class="pill"><span class="material-symbols-outlined">local_shipping</span> Dangerous goods screen</span>
@@ -3181,7 +3181,7 @@ function renderRMConditions(){
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Handle restricted outcome (KIOSK-410)</h1>
+        <h1>Handle restricted outcome</h1>
         <p class="subtitle">Confirm handling decision before capture item details.</p>
       </div>
       <span class="pill"><span class="material-symbols-outlined">gavel</span> RM handling</span>
@@ -3214,7 +3214,7 @@ function renderPolicyChecks(){
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Handle restricted outcome (KIOSK-410)</h1>
+        <h1>Handle restricted outcome</h1>
         <p class="subtitle">Confirm restricted and compensation context before item-detail capture.</p>
       </div>
       <span class="pill"><span class="material-symbols-outlined">shield</span> Restricted handling</span>
@@ -3295,7 +3295,7 @@ function renderCaptureItemDetails(){
   const isDomestic = isDomesticJourney();
   const speedOptions = domesticDeliveryPreferences();
   const speedSection = isDomestic ? `
-        <h3 style="margin-top:14px;">Delivery speed preference (KIOSK-427)</h3>
+        <h3 style="margin-top:14px;">Delivery speed preference</h3>
         <div class="choiceRow3" id="captureSpeedChoices">
           ${speedOptions.map(option => {
             const from = deliveryPreferenceIndicativeFrom(option.key);
@@ -3309,7 +3309,7 @@ function renderCaptureItemDetails(){
           }).join("")}
         </div>
   ` : `
-        <h3 style="margin-top:14px;">Delivery speed preference (KIOSK-427)</h3>
+        <h3 style="margin-top:14px;">Delivery speed preference</h3>
         <div class="banner ok show" style="display:block;">International item: this step is skipped.</div>
   `;
 
@@ -3329,14 +3329,14 @@ function renderCaptureItemDetails(){
         <span class="tag"><span class="material-symbols-outlined">straighten</span> ${fmt}</span>
       </div>
 
-      <h3 style="margin-top:14px;">Using the measuring device, please confirm the format of the item being posted (KIOSK-405)</h3>
+      <h3 style="margin-top:14px;">Using the measuring device, please confirm the format of the item being posted</h3>
       <div class="choiceRow3" id="captureFormatChoices">
         <button type="button" class="choiceBtn ${state.format==="letter"?"active":""}" data-value="letter"><span>Letter</span></button>
         <button type="button" class="choiceBtn ${state.format==="large_letter"?"active":""}" data-value="large_letter"><span>Large Letter</span></button>
         <button type="button" class="choiceBtn ${state.format==="parcel"?"active":""}" data-value="parcel"><span>Parcel</span></button>
       </div>
 
-      <h3 style="margin-top:14px;">Using the keypad, please enter the value of the item being posted (KIOSK-407)</h3>
+      <h3 style="margin-top:14px;">Using the keypad, please enter the value of the item being posted</h3>
       <input id="declaredValueInput" inputmode="decimal" placeholder="e.g. 49.99" value="${escapeHtml(state.declaredValue)}" />
 
       ${speedSection}
@@ -3468,7 +3468,7 @@ function renderEvriAdditionalScreening(){
       mode: "contents",
       icon: "category",
       label: "Contents type",
-      prompt: "Choose contents type for compensation checks (KIOSK-408 / KIOSK-795)."
+      prompt: "Choose contents type for compensation checks."
     },
     ...prohibitedGroups.map(group => ({
       key: `evri_prohibited_${group.key}`,
@@ -3564,7 +3564,7 @@ function renderEvriAdditionalScreening(){
   } else if(state.evriAdditionalSelection === "clear" && state.contentsCategoryKey){
     if(compensationWarning){
       outcomeClass = "danger";
-      outcomeTitle = "KIOSK-795 warning";
+      outcomeTitle = "Compensation warning";
       outcomeText = compensationCheck.reason || "Selected contents category is not covered for compensation on this service.";
     } else {
       outcomeClass = "ok";
@@ -3578,8 +3578,8 @@ function renderEvriAdditionalScreening(){
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>EVRi/DPD additional screening (KIOSK-408 / KIOSK-411 / KIOSK-795)</h1>
-        <p class="subtitle"><strong>Does your item match any of the following?</strong> Select one icon, then confirm the exact item.</p>
+        <h1>EVRi/DPD additional screening</h1>
+        <p class="subtitle"><strong>Does your item match any of the following?</strong> Select one icon, then choose the exact item.</p>
       </div>
       <span class="pill"><span class="material-symbols-outlined">policy</span> Additional carrier checks</span>
     </div>
@@ -3608,7 +3608,7 @@ function renderEvriAdditionalScreening(){
           <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
             <span class="tag"><span class="material-symbols-outlined">report</span>${escapeHtml(state.evriAdditionalSelection === "blocked" ? `Prohibited: ${selectedProhibitedItem ? selectedProhibitedItem.label : "Selected"}` : "Prohibited: None matched")}</span>
             <span class="tag"><span class="material-symbols-outlined">category</span>Contents: ${escapeHtml(selectedContents ? selectedContents.label : "Not selected")}</span>
-            <span class="tag"><span class="material-symbols-outlined">gpp_maybe</span>K795: ${escapeHtml(compensationWarning ? (state.multicarrierCompAcknowledged ? "Not covered (ack)" : "Not covered (pending ack)") : (selectedContents ? "Covered" : "Pending"))}</span>
+            <span class="tag"><span class="material-symbols-outlined">gpp_maybe</span>Compensation: ${escapeHtml(compensationWarning ? (state.multicarrierCompAcknowledged ? "Not covered (ack)" : "Not covered (pending ack)") : (selectedContents ? "Covered" : "Pending"))}</span>
             <span class="tag"><span class="material-symbols-outlined">package_2</span>Loss-only: ${state.coverLossOnlyKeys.size ? "Yes" : "No"}</span>
             <span class="tag"><span class="material-symbols-outlined">gpp_bad</span>No-comp: ${state.coverNoCompKeys.size ? "Yes" : "No"}</span>
           </div>
@@ -3629,7 +3629,6 @@ function renderEvriAdditionalScreening(){
 
           <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
             <button class="btn" id="evriScreeningBack"><span class="material-symbols-outlined">arrow_back</span>${escapeHtml(backLabel)}</button>
-            <button class="btn primary" id="evriScreeningConfirm"><span class="material-symbols-outlined">arrow_forward</span>Continue</button>
           </div>
         </div>
     </div>
@@ -3678,6 +3677,31 @@ function renderEvriAdditionalScreening(){
     render();
   }
 
+  function tryCompleteAndContinue(){
+    if(!state.evriAdditionalSelection) return false;
+    if(state.evriAdditionalBlocked){
+      state.evriScreeningComplete = false;
+      return false;
+    }
+    if(!state.contentsCategoryKey){
+      const fallback = firstAvailableContentsKey();
+      if(fallback){
+        setContentsByKey(fallback);
+      }
+    }
+    const latestCompensation = runMulticarrierCompensationCheck();
+    if(latestCompensation.warningShown && !state.multicarrierCompAcknowledged){
+      state.evriScreeningComplete = false;
+      return false;
+    }
+    state.evriLossOnlySelected = state.coverLossOnlyKeys.size > 0;
+    state.evriNoCompSelected = state.coverNoCompKeys.size > 0;
+    state.evriScreeningComplete = true;
+    state.evriScreeningOpen = false;
+    continueAfterScreening();
+    return true;
+  }
+
   function applySelection(type, key, groupKey = ""){
     if(type === "other"){
       state.evriSelectedProhibitedKey = null;
@@ -3695,17 +3719,9 @@ function renderEvriAdditionalScreening(){
       if(state.contentsCategoryKey){
         runMulticarrierCompensationCheck({ force:true });
       }
-      const comp = runMulticarrierCompensationCheck();
-      if(comp.warningShown && !state.multicarrierCompAcknowledged){
-        state.evriScreeningComplete = false;
+      if(!tryCompleteAndContinue()){
         render();
-        return;
       }
-      state.evriLossOnlySelected = false;
-      state.evriNoCompSelected = false;
-      state.evriScreeningComplete = true;
-      state.evriScreeningOpen = false;
-      continueAfterScreening();
       return;
     }
 
@@ -3715,7 +3731,7 @@ function renderEvriAdditionalScreening(){
       setContentsByKey(category.key);
       state.evriSelectedProhibitedKey = null;
       state.evriProhibitedGroupKey = "";
-      state.evriAdditionalSelection = "clear";
+      state.evriAdditionalSelection = "";
       state.evriAdditionalBlocked = false;
       clearCompensationFlags();
       resetMulticarrierCompensationState();
@@ -3757,8 +3773,9 @@ function renderEvriAdditionalScreening(){
       state.evriAdditionalBlocked = false;
       resetMulticarrierCompensationState();
       runMulticarrierCompensationCheck({ force:true });
-      state.evriScreeningComplete = false;
-      render();
+      if(!tryCompleteAndContinue()){
+        render();
+      }
       return;
     }
 
@@ -3776,8 +3793,9 @@ function renderEvriAdditionalScreening(){
       state.evriAdditionalBlocked = false;
       resetMulticarrierCompensationState();
       runMulticarrierCompensationCheck({ force:true });
-      state.evriScreeningComplete = false;
-      render();
+      if(!tryCompleteAndContinue()){
+        render();
+      }
     }
   }
 
@@ -3797,7 +3815,7 @@ function renderEvriAdditionalScreening(){
       options = contentsCategories.map(category => {
         const check = evaluateMulticarrierCompensation(chosenService, category.key);
         const sub = check.warningShown
-          ? "Outcome: No compensation warning (KIOSK-795)"
+          ? "Outcome: No compensation warning"
           : "Outcome: Compensation covered";
         return {
           key: category.key,
@@ -3912,6 +3930,9 @@ function renderEvriAdditionalScreening(){
         });
       }
       state.multicarrierCompAcknowledged = acknowledge;
+      if(acknowledge && tryCompleteAndContinue()){
+        return;
+      }
       state.evriScreeningComplete = false;
       render();
     });
@@ -3930,33 +3951,6 @@ function renderEvriAdditionalScreening(){
   document.getElementById("evriScreeningBack").addEventListener("click", ()=>{
     state.evriScreeningOpen = false;
     render();
-  });
-
-  document.getElementById("evriScreeningConfirm").addEventListener("click", ()=>{
-    if(!state.evriAdditionalSelection){
-      alert("Select an item category before continuing.");
-      return;
-    }
-    if(!state.contentsCategoryKey){
-      const fallback = firstAvailableContentsKey();
-      if(fallback){
-        setContentsByKey(fallback);
-      }
-    }
-    const latestCompensation = runMulticarrierCompensationCheck();
-    if(!state.evriAdditionalBlocked && latestCompensation.warningShown && !state.multicarrierCompAcknowledged){
-      alert("Acknowledge the KIOSK-795 no-compensation warning before continuing.");
-      return;
-    }
-    state.evriLossOnlySelected = state.coverLossOnlyKeys.size > 0;
-    state.evriNoCompSelected = state.coverNoCompKeys.size > 0;
-    state.evriScreeningComplete = true;
-    state.evriScreeningOpen = false;
-    if(state.evriAdditionalBlocked){
-      render();
-      return;
-    }
-    continueAfterScreening();
   });
 }
 
@@ -4015,18 +4009,18 @@ function renderFilterAndPresentOptions(){
     ? `RM DG selection: ${selectedRMRule.label}${state.rmConditionSatisfied ? " (conditions complete)." : " (conditions pending)."}` 
     : "RM DG selection: not set.";
   const narrativeContents = contentsCategory
-    ? `Contents category (KIOSK-408): ${contentsCategory.label}.`
-    : "Contents category (KIOSK-408): not selected.";
+    ? `Contents category: ${contentsCategory.label}.`
+    : "Contents category: not selected.";
   const narrativeCarrier = !chosenService
     ? "Select a postage product to determine carrier screening requirements."
     : needsEvriAdditional
     ? `EVRi/DPD screening: ${state.evriScreeningComplete ? "complete" : "pending"}${state.evriAdditionalSelection === "blocked" ? ` (blocked by ${evriProhibitedLabel})` : ""}.`
     : "Carrier-specific EVRi/DPD screening not required for current service.";
   const narrativeComp = !chosenService
-    ? "KIOSK-795 compensation check is part of EVRi/DPD additional screening."
+    ? "Compensation check is part of EVRi/DPD additional screening."
     : needsEvriAdditional
-    ? "KIOSK-795 compensation eligibility check required in the EVRi/DPD screening step."
-    : "KIOSK-795 compensation check not required for Royal Mail.";
+    ? "Compensation eligibility check required in the EVRi/DPD screening step."
+    : "compensation check not required for Royal Mail.";
   const narrativeNI = showNI
     ? `NI movement information: ${niMovementValidation().length ? "pending" : "complete"}${state.niCustomsReference ? ` (${state.niCustomsReference})` : ""}.`
     : "NI movement information not required for current postcode.";
@@ -4058,7 +4052,7 @@ function renderFilterAndPresentOptions(){
     screen.innerHTML = `
       <div class="stepHeader">
         <div>
-          <h1>Select postage product (KIOSK-414)</h1>
+          <h1>Select postage product</h1>
           <p class="subtitle">Choose a product. EVRi/DPD selections continue to additional goods/content screening.</p>
         </div>
         <span class="pill"><span class="material-symbols-outlined">tune</span> Service filtering</span>
@@ -4067,7 +4061,7 @@ function renderFilterAndPresentOptions(){
       <div class="flowShell">
         <div class="flowMain">
           <div class="card">
-            <h3>Service filtering (KIOSK-413 / KIOSK-415 / KIOSK-428)</h3>
+            <h3>Service filtering</h3>
             <h3 style="margin-top:14px;">Available services</h3>
             <div class="choiceGroup" id="serviceChoices">
               ${services.length ? services.map(service => `
@@ -4085,7 +4079,7 @@ function renderFilterAndPresentOptions(){
           <div class="flowNarrative">
             <h4>Journey Note</h4>
             <p>${chosenService && chosenService.profile === "evri_dpd"
-              ? "Selected EVRi/DPD: next screen is KIOSK-408/KIOSK-411/KIOSK-795 screening."
+              ? "Selected EVRi/DPD: next screen is additional screening."
               : "Select a postage product, then continue to recipient details."}</p>
             <p>${escapeHtml(narrativeContents)}</p>
             <p>${escapeHtml(narrativeComp)}</p>
@@ -4116,16 +4110,16 @@ function renderFilterAndPresentOptions(){
       : "Next screen: basket review.";
     const compensationNarrative = needsEvriAdditional
       ? (state.multicarrierCompOutcome === "not_covered"
-        ? `KIOSK-795: not covered${state.multicarrierCompAcknowledged ? " (acknowledged)." : " (pending acknowledgement)." }`
+        ? `Compensation: not covered${state.multicarrierCompAcknowledged ? " (acknowledged)." : " (pending acknowledgement)." }`
         : (state.multicarrierCompOutcome === "covered"
-          ? "KIOSK-795: covered."
-          : "KIOSK-795: pending check."))
-      : "KIOSK-795: not applicable (Royal Mail).";
+          ? "Compensation: covered."
+          : "Compensation: pending check."))
+      : "Compensation: not applicable (Royal Mail).";
 
     screen.innerHTML = `
       <div class="stepHeader">
         <div>
-          <h1>Enter destination address details (KIOSK-866)</h1>
+          <h1>Enter destination address details</h1>
           <p class="subtitle">Enter recipient postcode and first line of address.</p>
         </div>
         <span class="pill"><span class="material-symbols-outlined">location_on</span> Address entry</span>
@@ -4134,7 +4128,7 @@ function renderFilterAndPresentOptions(){
       <div class="flowShell">
         <div class="flowMain">
           <div class="card">
-            <h3>Selected postage product (KIOSK-414)</h3>
+            <h3>Selected postage product</h3>
             ${chosenService ? `
               <div class="helpNote">
                 <strong>Product:</strong> ${escapeHtml(chosenService.name)}<br/>
@@ -4150,7 +4144,7 @@ function renderFilterAndPresentOptions(){
           </div>
 
           <div class="card">
-            <h3>Recipient details (KIOSK-866)</h3>
+            <h3>Recipient details</h3>
             <input id="recipientPostcodeInput" placeholder="Recipient postcode (e.g. SW1A 1AA)" value="${escapeHtml(state.recipientPostcode)}" />
             <input id="recipientAddressInput" placeholder="Recipient address line" value="${escapeHtml(state.recipientAddress)}" style="margin-top:8px;" />
           </div>
@@ -4204,7 +4198,7 @@ function renderFilterAndPresentOptions(){
     screen.innerHTML = `
       <div class="stepHeader">
         <div>
-          <h1>Enter sender address details (KIOSK-866)</h1>
+          <h1>Enter sender address details</h1>
           <p class="subtitle">Enter sender postcode and first line of address.</p>
         </div>
         <span class="pill"><span class="material-symbols-outlined">person_pin_circle</span> Sender details</span>
@@ -4220,7 +4214,7 @@ function renderFilterAndPresentOptions(){
           </div>
 
           <div class="card">
-            <h3>Sender details (KIOSK-866)</h3>
+            <h3>Sender details</h3>
             <input id="senderPostcodeInput" placeholder="Sender postcode" value="${escapeHtml(state.senderPostcode)}" />
             <input id="senderAddressInput" placeholder="Sender address line" value="${escapeHtml(state.senderAddress)}" style="margin-top:8px;" />
           </div>
@@ -4258,7 +4252,7 @@ function renderFilterAndPresentOptions(){
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Northern Ireland movement information (KIOSK-867)</h1>
+        <h1>Northern Ireland movement information</h1>
         <p class="subtitle">BT postcode detected. Capture NI movement information before basket.</p>
       </div>
       <span class="pill"><span class="material-symbols-outlined">location_on</span> NI movement info</span>
@@ -4274,7 +4268,7 @@ function renderFilterAndPresentOptions(){
         </div>
 
         <div class="card">
-          <h3>Northern Ireland movement information (KIOSK-867)</h3>
+          <h3>Northern Ireland movement information</h3>
           <p style="margin-top:10px; margin-bottom:8px; color:var(--muted); font-size:13px;">Movement type</p>
           <div class="choiceRow3" id="niMovementTypeChoices">
             <button type="button" class="choiceBtn ${state.niMovementType==="c2c"?"active":""}" data-value="c2c"><span>C2C</span><span class="sub">Consumer to consumer</span></button>
@@ -4510,11 +4504,11 @@ function renderBasketAndPay(){
   const podSnippet = state.proofOfDelivery ? "Proof of delivery: Yes (+£1.50)" : "Proof of delivery: No";
   const compensationSnippet = service && service.profile === "evri_dpd"
     ? (state.multicarrierCompOutcome === "not_covered"
-      ? `KIOSK-795: Not covered${state.multicarrierCompAcknowledged ? " (acknowledged)" : " (pending acknowledgement)"}`
+      ? `Compensation: Not covered${state.multicarrierCompAcknowledged ? " (acknowledged)" : " (pending acknowledgement)"}`
       : (state.multicarrierCompOutcome === "covered"
-        ? "KIOSK-795: Covered"
-        : "KIOSK-795: Pending"))
-    : "KIOSK-795: Not applicable";
+        ? "Compensation: Covered"
+        : "Compensation: Pending"))
+    : "Compensation: Not applicable";
   const carrierContentSnippet = service && service.profile === "evri_dpd"
     ? `EVRi/DPD screening: ${state.evriScreeningComplete ? "Complete" : "Pending"} • ${compensationSnippet} • No-comp: ${state.evriNoCompSelected ? "Yes" : "No"} • Loss-only: ${state.evriLossOnlySelected ? "Yes" : "No"}`
     : rmDgSnippet;
@@ -4525,7 +4519,7 @@ function renderBasketAndPay(){
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Review & Pay (KIOSK-417)</h1>
+        <h1>Review & Pay</h1>
         <p class="subtitle">Review the item being processed, then finish to continue.</p>
       </div>
       <span class="pill"><span class="material-symbols-outlined">shopping_cart</span> Basket and pay</span>
@@ -4563,7 +4557,7 @@ function renderBasketAndPay(){
           ` : ""}
           ${service.profile === "evri_dpd" && state.multicarrierCompOutcome === "not_covered" ? `
             <div class="banner danger show" style="display:block; margin:12px 14px;">
-              KIOSK-795: This contents category is not covered by compensation on the selected multicarrier service.
+              This contents category is not covered by compensation on the selected multicarrier service.
             </div>
           ` : ""}
           ${service.profile === "evri_dpd" && state.evriLossOnlySelected ? `
@@ -4656,7 +4650,7 @@ function renderBasketAndPay(){
       }
       const compensation = runMulticarrierCompensationCheck();
       if(compensation.warningShown && !state.multicarrierCompAcknowledged){
-        alert("Acknowledge the KIOSK-795 compensation warning before finishing.");
+        alert("Acknowledge the compensation warning before finishing.");
         state.filterFlowStage = "service";
         state.evriScreeningOpen = true;
         navigateToStep(4);
@@ -4708,7 +4702,7 @@ function renderPrintAndConfirm(){
   screen.innerHTML = `
     <div class="stepHeader">
       <div>
-        <h1>Print and Confirm (KIOSK-421)</h1>
+        <h1>Print and Confirm</h1>
         <p class="subtitle">Print label(s) and show transaction summary/confirmation.</p>
       </div>
       <span class="pill"><span class="material-symbols-outlined">print</span> Print and confirm</span>
@@ -4716,7 +4710,7 @@ function renderPrintAndConfirm(){
 
     <div class="formRow">
       <div class="card">
-        <h3>Print postage label(s) (KIOSK-422)</h3>
+        <h3>Print postage label(s)</h3>
         <button class="btn primary" id="printLabelsBtn">
           <span class="material-symbols-outlined">print</span> Print label now
         </button>
@@ -4725,13 +4719,13 @@ function renderPrintAndConfirm(){
         ` : ""}
       </div>
       <div class="card">
-        <h3>Transaction summary / confirmation CoP (KIOSK-423)</h3>
+        <h3>Transaction summary / confirmation CoP</h3>
         <div class="helpNote">
           <strong>Reference:</strong> ${escapeHtml(state.transactionRef || "Pending")}<br/>
           <strong>Service:</strong> ${escapeHtml(service ? service.name : "Not selected")}<br/>
           <strong>Destination:</strong> ${dest}<br/>
           <strong>Contents category:</strong> ${escapeHtml(contentsCategory ? contentsCategory.label : "Not set")}<br/>
-          <strong>KIOSK-795 compensation:</strong> ${escapeHtml(compensationLine)}<br/>
+          <strong>Compensation:</strong> ${escapeHtml(compensationLine)}<br/>
           <strong>Total paid:</strong> £${total.toFixed(2)}<br/>
           <strong>Recipient postcode:</strong> ${escapeHtml(state.recipientPostcode || "—")}
         </div>
@@ -4754,7 +4748,7 @@ function renderSummary(){
   const service = selectedService();
   const profile = service ? (service.profile === "royal_mail" ? "Royal Mail rules" : "EVRi/DPD rules") : "Not selected";
   const contentsCategory = selectedContentsCategory();
-  const k795Summary = service && service.profile === "evri_dpd"
+  const compensationSummary = service && service.profile === "evri_dpd"
     ? (state.multicarrierCompOutcome === "not_covered"
       ? `Not covered${state.multicarrierCompAcknowledged ? " (acknowledged)" : " (pending acknowledgement)"}`
       : (state.multicarrierCompOutcome === "covered" ? "Covered" : "Pending"))
@@ -4821,7 +4815,7 @@ function renderSummary(){
             <strong>RM GB to NI status:</strong> ${rmNi.ok ? "Clear" : escapeHtml(rmNi.message || "Blocked or incomplete")}<br/>
             <strong>Delivery preference:</strong> ${escapeHtml(speedDisplay)}<br/>
             <strong>Delivery preference audit:</strong> ${lastSpeedAudit ? `${escapeHtml(lastSpeedAudit.at)} (${escapeHtml(lastSpeedAudit.deliverySpeedLabel || lastSpeedAudit.deliverySpeed || "Unknown")})` : "No speed event logged"}<br/>
-            <strong>KIOSK-795 compensation:</strong> ${escapeHtml(k795Summary)}<br/>
+            <strong>Compensation:</strong> ${escapeHtml(compensationSummary)}<br/>
             <strong>EVRi/DPD loss-only flag:</strong> ${state.evriLossOnlySelected ? "Yes" : "No"}<br/>
             <strong>EVRi/DPD no-comp flag:</strong> ${state.evriNoCompSelected ? "Yes" : "No"}<br/>
             <strong>Legacy restricted flags:</strong> ${restrictedLabels.length ? escapeHtml(restrictedLabels.join(", ")) : "None"} / ${lossLabels.length ? escapeHtml(lossLabels.join(", ")) : "None"} / ${ncLabels.length ? escapeHtml(ncLabels.join(", ")) : "None"}
